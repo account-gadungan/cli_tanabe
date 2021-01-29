@@ -42,9 +42,10 @@
 						<INPUT LABEL="Objective" NAME="trnevent_obj" PARAM="trnevent_obj" TYPE="MEMO" COL="50" ROW="3" REQUIRED="YES" ERRMSG="Please Input Objective on the tab of General Info" MAXLEN="450"/>
 						<INPUT LABEL="Target Participants" NAME="trnevent_target" PARAM="trnevent_target" TYPE="MEMO" COL="50" ROW="3" REQUIRED="YES" ERRMSG="Please Input Target Participants on the tab of General Info" MAXLEN="450"/>
 						<!-- muadz penambahan custom -->
-						<INPUT LABEL="Delivery Method" NAME="delivmethod" PARAM="delivmethod" TYPE="FILTER" REQUIRED="Yes" LISTSOURCE="TrainingEvent.filterDelivMethod" LISTMEMBER="TrainingEvent.filterDelivMethod" ROW="10" MAXROW="100" ERRMSG="Please Select Delivery Method"/>
+						<!--<INPUT LABEL="Delivery Method" NAME="delivmethod" PARAM="delivmethod" TYPE="FILTER" REQUIRED="Yes" LISTSOURCE="TrainingEvent.filterDelivMethod" LISTMEMBER="TrainingEvent.filterSelDelivMethod" ROW="10" MAXROW="100" ERRMSG="Please Select Delivery Method"/>-->
+						<INPUT LABEL="Delivery Method" NAME="delivmethod" PARAM="delivmethod" TYPE="SELECT" SIZE="5~200px" LISTSOURCE="TrainingEvent.filterSelDelivMethod"/>
 						<!-- <INPUT LABEL="Evaluation Method" NAME="evalmethod" PARAM="evalmethod" TYPE="SUGGEST" LISTMANDATORY="YES" REQUIRED="YES" ERRMSG="Please Select Evaluation Method" GROUP="" LISTSOURCE="TrainingEvent.filterEvalMethod" /> -->
-						<INPUT LABEL="Evaluation Method" NAME="evalmethod" PARAM="evalmethod" TYPE="SELECT" LISTSOURCE="TrainingEvent"/>
+						<INPUT LABEL="Evaluation Method" NAME="evalmethod" PARAM="evalmethod" TYPE="SELECT" LISTSOURCE="TrainingEvent" ONCHANGE="changeEval();"/>
 						<INPUT LABEL="Acceptance Criteria (Score)" NAME="acceptcriteria" TYPE="NUMERIC" SIZE="5" MAXLEN="3" PARAM="acceptcriteria" REQUIRED="YES" ERRMSG="Please Input Acceptance Criteria on the tab of General Info"/>
 						<INPUT LABEL="Material/Content" NAME="material" PARAM="material" TYPE="MEMO" COL="50" ROW="3" REQUIRED="YES" ERRMSG="Please Input Material/Content on the tab of General Info" MAXLEN="10000"/>
 						<!-- muadz penambahan custom -->
@@ -353,6 +354,17 @@
 		/* End ESS Javascript*/
 		
 		/* Start Other Javascript */
+
+		window.addEventListener('DOMContentLoaded', (event) => {
+			changeEval();
+		});
+		function changeEval(){
+			if(document.getElementById('inp_evalmethod').value == 'NOTAVAIL'){
+				document.getElementById('tr_inp_acceptcriteria').style.display = 'none';
+			}else{
+				document.getElementById('tr_inp_acceptcriteria').style.display = '';
+			}
+		}
 				
 		function editenablecertified(){
 			if(document.getElementById('inp_trnevent_enablecertified').checked){
@@ -459,6 +471,7 @@
 
 		function gethdnlistmember()
 		{
+			console.log('473')
 			var trnevent_code = document.getElementById('inp_trnevent_code').value;
 			var listmember = getAJAXContent("?ofid=TrainingEventParticipant.getHdnSelMember&amp;trnevent_code="+trnevent_code,$sf("hdnSelectedinp_group_emp"));
 			var selMember = document.getElementById('hdnSelectedinp_group_emp').value;
@@ -489,6 +502,7 @@
 				return okAllDate;
 		}
 		function populateParticipant(){
+				console.log('503')
 				var amtEmp = document.getElementById("selinp_group_emp").length;
 				document.getElementById("inp_listempselect").value =  '';
 				for(i=0;i[lt]amtEmp;i++){
@@ -502,6 +516,7 @@
 		}
 
 		function validateOther() {
+			console.log('516');
 			populateParticipant();
 			
 			var rowtotActivity = document.getElementById("hdn_idx").value;
