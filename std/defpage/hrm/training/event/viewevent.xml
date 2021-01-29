@@ -1,0 +1,775 @@
+<!--
+			Author               : 
+			E-mail               : 
+			Company              : DataOn/ PT. Indodev Niaga Internet
+			Client               :  
+			FileName             : \repository\defpage\hrm\training\course\viewevent.xml
+			Application          : SunFish HR SaaS
+			Date                 : 15 Juli 2013
+			Summary              : 
+			Revisions            : 
+-->
+<SFPAGE TITLE="Training Event" ACCESS="hrm.training.event:edit">
+	<SFFORM TITLE="Training Event" DATASOURCE="TrainingEvent.viewevent" ACTION="TrainingEvent.SaveAll" PASSING ="trnevent_code,trncourse_code"  NAME="frmtrneventedit" WIDTH="100%" HEIGHT="100%" >
+		<TOOLBAR></TOOLBAR>
+		<FIELDSET>
+			<INPUT LABEL="" TYPE="HIDDEN" PARAM="tabrowhide" NAME="tabrowhide"/>
+			
+			<INPUT LABEL="Event No." NAME="trnevent_code" PARAM="trnevent_code" TYPE="LABEL"/>
+			<INPUT LABEL="Training Course" NAME="trncourse_name" PARAM="trncourse_name" TYPE="LABEL"/><!-- LISTSOURCE="TrainingEvent.filterTrainingCourse" REQUIRED="YES"/>-->
+			<INPUT LABEL="Course" NAME="hdn_trncourse_code" PARAM="trncourse_code" TYPE="HIDDEN"/>
+			<INPUT LABEL="Training Topic" NAME="trnevent_topic" PARAM="trnevent_topic" TYPE="TEXT" MAXLEN="50" SIZE="55" REQUIRED="YES"/>
+			<INPUT LABEL="Provider Type" NAME="nametype" PARAM="trnevent_type" TYPE="RADIO" OPTIONS="INTERNAL=Internal|EXTERNAL=External" ONCLICK="editClick(this.value);" REQUIRED="YES" /><!-- TYPE="SUGGEST" LISTMANDATORY="YES" LISTSOURCE="TrainingEvent.filterEventType" ERRMSG="Please Select Training Type"  GROUP="type~"/>
+			<INPUT LABEL="[+]" TYPE="BUTTON" ONCLICK="popWindow('?xfid=hrm.setting.masterdata.add&amp;table_name=TTRMEVENTTYPE','PopType');" SIZE="5" GROUP="type~"/>-->
+			<INPUT LABEL="Type" NAME="hdn_nametype" PARAM="trnevent_type" TYPE="HIDDEN"/>
+			<INPUT LABEL="Provider" NAME="provider_code" PARAM="provider_code" TYPE="SUGGEST" LISTMANDATORY="YES" REQUIRED="YES" ERRMSG="Please Input Provider" GROUP="prov~" LISTSOURCE="TrainingProvider.filterProvider" />
+			<INPUT LABEL="Add New" TYPE="BUTTON" ONCLICK="popWindow('?xfid=hrm.setting.training.provider.add','PopType');" SIZE="5" ICON="suggest-add.png" GROUP="prov~"/>
+			<INPUT LABEL="Date" TYPE="LABEL" DEFAULT=" " NAME="period" PARAM="period" GROUP="periode" REQUIRED="YES" />
+			<INPUT LABEL="" TYPE="DATE"  NAME="trnevent_startdate" PARAM="trnevent_startdate" REQUIRED="Yes" DEFAULT="TODAY" GROUP="periode~"/>
+			<INPUT LABEL="To" TYPE="DATE"  NAME="trnevent_enddate" PARAM="trnevent_enddate" REQUIRED="Yes" DEFAULT="TODAY" GROUP="periode~"/>
+			<INPUT LABEL="Status" NAME="trnevent_sts" PARAM="trnevent_sts" TYPE="SELECT" LISTSOURCE="TrainingEvent.refstatus" REQUIRED="YES" ONCHANGE="cekTrnStatus();"/>
+			<INPUT LABEL='-' TYPE='HIDDEN' PARAM='listatt_participant' NAME='listattparticipant'/>
+			<INPUT LABEL='-' TYPE='HIDDEN' PARAM='countAtt' NAME='countAtt'/>
+			<INPUT LABEL='-' TYPE='HIDDEN' PARAM='countFdbk' NAME='countFdbk'/>
+			<INPUT LABEL='-' TYPE='HIDDEN' PARAM='countEval' NAME='countEval'/>
+		</FIELDSET> 
+		<TABPAGE WIDTH="700" HEIGHT="450">
+			<TABROW>
+				<TAB LABEL="General Info">
+					<FIELDSET LABEL="General Info">
+						<!--<INPUT LABEL="-" NAME="generalinfo" TYPE="SCRIPT" TEMPLATE="hrm.training.event.vieweventinfo&amp;trnevent_code=#trnevent_code#&amp;company_code=#REQUEST.SCOOKIE.COCODE#"/>-->
+						<INPUT LABEL="Background" NAME="trnevent_bckground" PARAM="trnevent_bckground" TYPE="MEMO" COL="50" ROW="3" REQUIRED="YES" ERRMSG="Please Input Background on the tab of General Info" MAXLEN="450"/>
+						<INPUT LABEL="Objective" NAME="trnevent_obj" PARAM="trnevent_obj" TYPE="MEMO" COL="50" ROW="3" REQUIRED="YES" ERRMSG="Please Input Objective on the tab of General Info" MAXLEN="450"/>
+						<INPUT LABEL="Target Participants" NAME="trnevent_target" PARAM="trnevent_target" TYPE="MEMO" COL="50" ROW="3" REQUIRED="YES" ERRMSG="Please Input Target Participants on the tab of General Info" MAXLEN="450"/>
+						<!-- muadz penambahan custom -->
+						<INPUT LABEL="Delivery Method" NAME="delivmethod" PARAM="delivmethod" TYPE="FILTER" REQUIRED="Yes" LISTSOURCE="TrainingEvent.filterDelivMethod" LISTMEMBER="TrainingEvent.filterDelivMethod" ROW="10" MAXROW="100" ERRMSG="Please Select Delivery Method"/>
+						<!-- <INPUT LABEL="Evaluation Method" NAME="evalmethod" PARAM="evalmethod" TYPE="SUGGEST" LISTMANDATORY="YES" REQUIRED="YES" ERRMSG="Please Select Evaluation Method" GROUP="" LISTSOURCE="TrainingEvent.filterEvalMethod" /> -->
+						<INPUT LABEL="Evaluation Method" NAME="evalmethod" PARAM="evalmethod" TYPE="SELECT" LISTSOURCE="TrainingEvent"/>
+						<INPUT LABEL="Acceptance Criteria (Score)" NAME="acceptcriteria" TYPE="NUMERIC" SIZE="5" MAXLEN="3" PARAM="acceptcriteria" REQUIRED="YES" ERRMSG="Please Input Acceptance Criteria on the tab of General Info"/>
+						<INPUT LABEL="Material/Content" NAME="material" PARAM="material" TYPE="MEMO" COL="50" ROW="3" REQUIRED="YES" ERRMSG="Please Input Material/Content on the tab of General Info" MAXLEN="10000"/>
+						<!-- muadz penambahan custom -->
+						<INPUT LABEL="Remark" NAME="trnevent_remark" PARAM="trnevent_remark" TYPE="MEMO" COL="50" ROW="3" REQUIRED="NO" ERRMSG="Please Input Remark on the tab of General Info" MAXLEN="450"/>
+						<INPUT LABEL="Attachment" NAME="trnevent_attachment" PARAM="trnevent_attachment" TYPE="FILE"/>
+						<INPUT LABEL="~" TYPE="DOWNLINK" PARAM="trnevent_attachment" SETTINGS="txt~trneventinfo"/>
+						<INPUT LABEL="File Attachment" NAME="hdn_trnevent_attachment" TYPE="HIDDEN" PARAM="trnevent_attachment"/>
+						<INPUT LABEL="~" NAME="extensi" PARAM="extensi" TYPE="SCRIPT"  TEMPLATE="hrm.training.course.getext&amp;upload_code=trneventinfo"/>
+						
+						<INPUT SHOWIF="REQUEST.Scookie.COTAXCO eq 'TH'" LABEL="Include in statutory report" NAME="in_threport" PARAM="in_threport"  TYPE="CHECKBOX" OPTIONS="1=Yes|"/>
+						
+					</FIELDSET>
+				</TAB>
+				<TAB LABEL="Location">
+					<FIELDSET LABEL="Location">
+						<INPUT LABEL="Training Venue" NAME="venue_code" PARAM="venue_code" TYPE="SUGGEST" GROUP="ven~" LISTSOURCE="TrainingVenue.filterVanue" LISTMANDATORY="YES" ONBLUR="editaddress();" REQUIRED="YES" ERRMSG="Please Input Training Venue on the tab of Location" />
+						<INPUT LABEL="Add New" TYPE="BUTTON" ONCLICK="popWindow('?xfid=hrm.setting.training.venue.add','PopType');" SIZE="5" ICON="suggest-add.png" GROUP="ven~"/>
+						<INPUT LABEL="Room" NAME="room_code" PARAM="room_code" TYPE="SUGGEST" LISTMANDATORY="YES" LISTSOURCE="TrainingVenue.FilterRoom" REQUIRED="NO"/>
+						<INPUT LABEL="Address" NAME="trnevent_address" PARAM="trnevent_address" TYPE="MEMO" COL="50" ROW="3" MAXLEN="250"/>
+						<INPUT TYPE="HIDDEN" PARAM="trnevent_address" NAME="hdn_temp_addr"/>
+						<INPUT TYPE="HIDDEN" PARAM="venue_code" NAME="prevvenue_code"/>
+						<INPUT TYPE="HIDDEN" PARAM="room_code" NAME="prevroom_name"/>
+						
+						
+					</FIELDSET>
+				</TAB>
+				<TAB LABEL="Agenda">
+					<FIELDSET LABEL="Agenda">
+						<INPUT LABEL="~" NAME="SDrowtot" PARAM="SDrowtot" DEFAULT="1" TYPE="HIDDEN"/>
+						<INPUT LABEL="~" NAME="SD1rowtot" PARAM="SD1rowtot" DEFAULT="1" TYPE="HIDDEN"/>
+						<INPUT LABEL="-" NAME="agenda" PARAM="agenda" TYPE="SCRIPT" TEMPLATE="hrm.training.event.agenda&amp;trnevent_code=#URL.trnevent_code#&amp;company_code=#REQUEST.SCookie.COCODE#&amp;provider_code={provider_code}"/>
+					</FIELDSET>
+				</TAB>
+				<TAB LABEL="Participant">
+					<FIELDSET LABEL="Participant">
+						<INPUT LABEL="Training Capacity" NAME="trnevent_capacity" PARAM="trnevent_capacity" TYPE="TEXT" REQUIRED="YES" ERRMSG="Please Input Training Capacity"/>
+						<!--<INPUT LABEL="Use Job Title Filter" NAME="chk_filter" PARAM="total_coursejobtitle" TYPE="CHECKBOX" OPTIONS="1=Yes" ONCLICK="chkFilterJob();" />-->
+						<input LABEL="~" NAME="jobtitlestat" PARAM="chk_filter" TYPE="HIDDEN" default=""/>
+						<INPUT LABEL="Use Job Title Filter" NAME="chk_filter" PARAM="chk_filter" TYPE="RADIO" OPTIONS="none=None|related=Related|mandatory=Mandatory" ONCLICK="chkFilterJob();" class="jobtitlefilter"/>
+						<INPUT LABEL="Employee" TYPE="FILTEREMPLOYEE" NAME="group_emp" PARAM="trnevent_code" FILTERADDON="EMPNOLIST" LISTSOURCE="TrainingEvent.filterEmployee" LISTMEMBER="TrainingEvent.FilterSelect" ROW="10" MAXROW="10000" INCLUSIVE="param"/>   						
+						<INPUT LABEL="View Immediate Resign Employee" TYPE="BUTTON" ONCLICK="viewImdtResignEmp();" SIZE="80"/>
+						<!-- ENC50917-81140 -->
+						<INPUT LABEL="View Waiting List" NAME="ViewWaitingList" TYPE="BUTTON" ONCLICK="viewWaitingListEmp();" SIZE="80"/>
+						<!-- /ENC50917-81140 -->
+						<INPUT LABEL="~" NAME="hdntrnevent_status"  PARAM="trnevent_sts" TYPE="HIDDEN" default=""/>
+						<INPUT LABEL="~" NAME="listemp"  PARAM="listemp" TYPE="HIDDEN" default=" "/>
+						<input LABEL="~" NAME="listempselect" PARAM="listempselect" TYPE="HIDDEN" default=""/>
+						<input LABEL="~" NAME="listempfromwaitinglist" PARAM="listempfromwaitinglist" TYPE="HIDDEN" default=""/>
+						<!--<input LABEL="~" NAME="listempfromwaitinglistTrPlan" PARAM="listempfromwaitinglistTrPlan" TYPE="HIDDEN" default=""/>-->
+						
+					</FIELDSET>
+				</TAB>
+				<TAB LABEL="ESS">
+					<FIELDSET LABEL="ESS">
+						<INPUT LABEL="-" NAME="ess" PARAM="ess" TYPE="SCRIPT" TEMPLATE="hrm.training.event.vieweventess&amp;trnevent_code=#URL.trnevent_code#&amp;company_code=#REQUEST.SCookie.COCODE#&amp;trncourse_code=#URL.trncourse_code#"/>
+					</FIELDSET>
+				</TAB>
+				<TAB LABEL="Other">
+					<FIELDSET LABEL="Other">
+						<INPUT LABEL="Certified" NAME="trnevent_enablecertified" PARAM="trnevent_enablecertified"  TYPE="CHECKBOX" OPTIONS="Y=Yes|" ONCHANGE="editenablecertified();"/>
+						<INPUT LABEL="Valid Thru" TYPE="DATE"  NAME="trnevent_validcertified" PARAM="trnevent_validcertified"/>
+						
+						<INPUT LABEL="Print Certificate" NAME="print_certificate" PARAM="trnevent_enableprintcertificate"  TYPE="CHECKBOX" OPTIONS="Y=Yes|" ONCHANGE="enabledprintcertificate();"/>
+						<INPUT LABEL="Print Date Certificate" TYPE="LABEL" DEFAULT=" " NAME="print_date_certificate" PARAM="print_date_certificate" GROUP="print_date_certificate" REQUIRED="YES" />
+            			<INPUT LABEL="" TYPE="DATE"  NAME="Printcertificate_startdate" PARAM="Printcertificate_startdate" REQUIRED="Yes" DEFAULT="TODAY" GROUP="print_date_certificate~"/>
+            			<INPUT LABEL="To" TYPE="DATE"  NAME="Printcertificate_enddate" PARAM="Printcertificate_enddate" REQUIRED="Yes" DEFAULT="TODAY" GROUP="print_date_certificate~"/>
+						<INPUT LABEL="One Print Only" NAME="once_print" PARAM="Isonce_printcertificate"  TYPE="CHECKBOX" OPTIONS="Y=Yes|"/>
+						
+						<INPUT LABEL="Service Agreement" NAME="trnevent_agreement" PARAM="trnevent_agreement"  TYPE="CHECKBOX" OPTIONS="Y=Yes|" ONCHANGE="editenableagreement();"/>
+						<INPUT LABEL="Valid Thru" TYPE="DATE"  NAME="trnevent_validagreement" PARAM="trnevent_validagreement" REQUIRED="YES" ERRMSG="Please Input Service Agreement Valid Thru" />
+						
+						<INPUT LABEL="Training Course" NAME="hdn_trncoursecode" PARAM="hdn_trncoursecode" TYPE="HIDDEN" REQUIRED="YES"/>
+						<INPUT LABEL="Training Topic" NAME="hdn_trnevent_topic" PARAM="hdn_trnevent_topic" TYPE="HIDDEN" REQUIRED="YES"/>
+						<INPUT LABEL="Training Type" NAME="hdn_trnnametype" PARAM="hdn_trnnametype" TYPE="HIDDEN" REQUIRED="YES"/>
+						<INPUT LABEL="startdate" NAME="hdn_startdate" PARAM="hdn_startdate" TYPE="HIDDEN" REQUIRED="YES"/>
+						<INPUT LABEL="enddate" NAME="hdn_enddate" PARAM="hdn_enddate" TYPE="HIDDEN" REQUIRED="YES"/>
+						<INPUT LABEL="Training Event Status" NAME="hdn_trnevent_sts" PARAM="hdn_trnevent_sts" TYPE="HIDDEN" REQUIRED="YES"/>
+						<INPUT LABEL="Provider" NAME="hdnprovider_code" PARAM="provider_codes" TYPE="HIDDEN" />
+					    <INPUT LABEL="~" NAME="certificate_code" PARAM="certificate_code" TYPE="HIDDEN" />
+						<INPUT LABEL="~" NAME="trnevent_enableprintcertificate" PARAM="trnevent_enableprintcertificate" TYPE="HIDDEN" />
+						
+						
+					</FIELDSET>
+				</TAB>
+				<TAB LABEL="Cost">
+					<FIELDSET LABEL="Cost">
+						<INPUT LABEL="-" NAME="itemcost" PARAM="itemcost" TYPE="SCRIPT" TEMPLATE="hrm.training.event.itemcost&amp;trnevent_code=#URL.trnevent_code#&amp;company_code=#REQUEST.SCookie.COCODE#&amp;costcenter_type=#qForm.costcenter_type#"/>
+					</FIELDSET>
+				</TAB>
+				<!--<TAB LABEL="Location" PAGELINK="hrm.training.event.vieweventvenue&amp;trnevent_code=[trnevent_code]&amp;company_code=[company_code]"/>
+				<TAB LABEL="Agenda" PAGELINK="hrm.training.event.vieweventagenda&amp;trnevent_code=[trnevent_code]&amp;company_code=[company_code]"/>
+				<TAB LABEL="Participant" PAGELINK="hrm.training.event.vieweventparticipant&amp;trnevent_code=[trnevent_code]&amp;company_code=[company_code]"/>
+				<TAB LABEL="ESS" PAGELINK="hrm.training.event.vieweventess&amp;trnevent_code=[trnevent_code]&amp;company_code=[company_code]"/>-->
+				<!--TAB LABEL="Cost" PAGELINK=""/-->
+				<!--<TAB LABEL="OTHER" PAGELINK="hrm.training.event.vieweventother&amp;trnevent_code=[trnevent_code]&amp;company_code=[company_code]"/>-->	
+			</TABROW>
+		</TABPAGE>
+		
+		<BUTTONLIST>
+			<BUTTON TYPE="DELETE" ACTION="TrainingEventInfo.DeleteAll"></BUTTON>
+			<BUTTON TYPE="SUBMIT"></BUTTON>
+		</BUTTONLIST>
+		
+		<SCRIPT FOR="FOOTER">
+		
+		function cekTrnStatus()
+		{
+			var totWait = #val(qForm.headWait)#;
+			if(totWait > 0){
+			  document.getElementById('btn_ViewWaitingList').style.display='';
+			}else{
+			  document.getElementById('btn_ViewWaitingList').style.display='none';
+			}
+			var i=0;
+			var formFieldsLength = formFields.length;
+			
+			if(document.frmtrneventedit.inp_trnevent_sts.value==2 || document.frmtrneventedit.inp_trnevent_sts.value==1)
+			{
+				$("##lbl_inp_group_emp span:first").hide();   
+				for(i=0;i&lt;formFieldsLength;i++)
+				{
+					if(formFields[i]["NAME"] =='group_emp')
+					{
+						if(formFields[i].REQUIRED=="YES")
+						{
+							formFields[i].REQUIRED="NO";
+						}
+					}
+				}
+			}
+			else
+			{
+				$("##lbl_inp_group_emp span:first").show();
+				for(i=0;i&lt;formFieldsLength;i++)
+				{
+					if(formFields[i]["NAME"] =='group_emp')
+					{
+						if(formFields[i].REQUIRED=="NO")
+						{
+							formFields[i].REQUIRED="YES";
+						}
+					}
+				}
+			}
+		  
+		}
+	
+		
+		var strData = '';
+		function ListAppend(strData, strValue){
+					if(strData == "")
+						strData = strValue;
+					else
+						strData = strData + "," + strValue;
+						
+					return strData;
+		}
+		try { /**try to add callback on the existing js function (showTab)**/
+						if (typeof(oldShowTab)=="undefined" [AND] typeof(showTab)=="function") {
+						 var oldShowTab = showTab;
+						 showTab = function(actid) {    
+						  strData = ListAppend(strData,actid);
+						  $sf('inp_tabrowhide').value = strData;
+						  oldShowTab(actid);
+					};
+					}
+					}
+		catch(e){}
+		if(document.frmtrneventedit.inp_trnevent_sts.value==4){
+		    if(document.frmtrneventedit.inp_countAtt.value != 0 || document.frmtrneventedit.inp_countFdbk.value != 0 || document.frmtrneventedit.inp_countEval.value != 0){
+			    document.getElementById('btn_a_0').style.display='none';
+			}
+			
+			if(document.frmtrneventedit.inp_countAtt.value &gt; 0){
+			    if(document.frmtrneventedit.inp_countFdbk.value &gt; 0){
+			        if(document.frmtrneventedit.inp_countEval.value &gt; 0){
+			            document.getElementById('btn_a_1').style.display='none';
+			        }
+			    }
+			}
+			//document.getElementById('btn_a_1').style.display='none';
+			document.getElementById('inp_trnevent_sts').style.backgroundColor = '##80808038';
+			document.getElementById('inp_trnevent_sts').disabled = 'true';
+		}
+				
+		function editClick(obj){
+			var nametypes = document.getElementById('inp_hdn_nametype').value;
+			document.getElementById('inp_hdn_nametype').value = obj;
+			document.getElementById('hdn_type').value = obj;
+			document.getElementById('inp_provider_code').value = '';
+			document.getElementById('hdn_provider_code').value = '';
+			
+			hideTip();          
+		}
+		
+		/* Start Vanue Javascript*/
+		
+		function editperiod(){
+			var hdnvanuecode = document.getElementById('hdn_venue_code').value;
+			document.getElementById('inp_room_code').value = '';
+			document.getElementById('hdn_room_code').value = '';
+			document.getElementById('inp_trnevent_address').value = '';
+			//searchFilter(null,'?ofid=TrainingVenue.FilterRoom','hdn_venue_code',10000);
+			getAJAXContent('?ofid=TrainingVenue.FilterRoom&amp;hdn_venue_code='+$sf('hdn_venue_code').value,'spAjax');
+			hideTip();
+			//console.log('aik');
+		}
+		
+		function editaddress(){
+		    var hdnvanuecode = document.getElementById('hdn_venue_code').value;
+		    var hdntempaddr = document.getElementById('inp_hdn_temp_addr').value;
+			//searchFilter(null,'?ofid=TrainingVenue.filterAddress','hdn_venue_code',10000);    
+			getAJAXContent('?ofid=TrainingVenue.filterAddress&amp;hdn_venue_code='+$sf('hdn_venue_code').value+'&amp;hdn_temp_addr='+hdntempaddr,'spAjax');
+			hideTip();
+		}   
+		
+		function setroom(){
+		    var codevanue = document.getElementById('hdn_venue_code').value;
+			var namevenue = document.getElementById('inp_venue_code').value;
+			var prevcodevanue = document.getElementById('inp_prevvenue_code').value;
+			
+			if(prevcodevanue != codevanue){
+		        document.getElementById('inp_room_code').value = ''; 
+			}
+		}
+		
+		function editroom(){
+		    var codevanue = document.getElementById('hdn_venue_code').value;
+			if(codevanue==''){
+				alert("[SFTEXT:ERPlease Select Training Vanue]"); 
+				document.getElementById('inp_room_code').value = '';
+				document.getElementById('hdn_room_code').value = '';
+				document.getElementById('inp_venue_code').focus();
+				return false;
+			}
+			
+		}
+		
+		
+		/* End Vanue Javascript */
+		
+		/* Start ESS 
+		if(document.getElementById('inp_trnevent_enablereq').checked){
+			document.getElementById('tr_inp_trnevent_lastregdate').style.display = '';
+		}
+		else{
+			document.getElementById('tr_inp_trnevent_lastregdate').style.display = 'none';
+		}
+		
+		if(document.getElementById('inp_trnevent_enablecontent').checked){
+			document.getElementById('tr_inp_contentaccessdate').style.display = '';
+		}
+		else{
+			document.getElementById('tr_inp_contentaccessdate').style.display = 'none';
+		}
+		
+		if(document.getElementById('inp_trnevent_enablefeedback').checked){
+			document.getElementById('tr_inp_trnevent_feedbackduedate').style.display = '';
+		}
+		else{
+			document.getElementById('tr_inp_trnevent_feedbackduedate').style.display = 'none';
+		}
+		
+		if(document.getElementById('inp_trnevent_enableeval').checked){
+			document.getElementById('tr_inp_trnevent_evalduedate').style.display = '';
+		}
+		else{
+			document.getElementById('tr_inp_trnevent_evalduedate').style.display = 'none';
+		}
+		*/
+		function editenablereq(){
+			if(document.getElementById('inp_trnevent_enablereq').checked){
+				document.getElementById('tr_inp_trnevent_lastregdate').style.display = '';
+			}
+			else{
+				document.getElementById('tr_inp_trnevent_lastregdate').style.display = 'none';
+			}
+		}
+		
+		function editenablecon(){
+			if(document.getElementById('inp_trnevent_enablecontent').checked){
+				document.getElementById('tr_inp_contentaccessdate').style.display = '';
+			}
+			else{
+				document.getElementById('tr_inp_contentaccessdate').style.display = 'none';
+			}
+		}
+		
+		function editenablefeedback(){
+			if(document.getElementById('inp_trnevent_enablefeedback').checked){
+				document.getElementById('tr_inp_trnevent_feedbackduedate').style.display = '';
+			}
+			else{
+				document.getElementById('tr_inp_trnevent_feedbackduedate').style.display = 'none';
+			}
+		}
+
+		function editenableevaluation(){
+			if(document.getElementById('inp_trnevent_enableeval').checked){
+				document.getElementById('tr_inp_trnevent_evalduedate').style.display = '';
+			}
+			else{
+				document.getElementById('tr_inp_trnevent_evalduedate').style.display = 'none';
+			}
+		}
+		/* End ESS Javascript*/
+		
+		/* Start Other Javascript */
+				
+		function editenablecertified(){
+			if(document.getElementById('inp_trnevent_enablecertified').checked){
+				document.getElementById('tr_inp_trnevent_validcertified').style.display = '';
+				document.getElementById('tr_inp_print_certificate').style.display = '';
+			}
+			else{
+			    document.getElementById('tr_inp_print_certificate').style.display = 'none';
+				document.getElementById('tr_inp_trnevent_validcertified').style.display = 'none';
+				document.getElementById('tr_inp_print_date_certificate').style.display = 'none';
+				document.getElementById('tr_inp_once_print').style.display = 'none';
+				document.getElementById('inp_print_certificate').checked = false;
+			}
+		}
+		
+		function enabledprintcertificate(){
+		    if( $('[id=inp_certificate_code]').val() == ''){    
+		        document.getElementById('inp_print_certificate').disabled = true;
+		    }
+		    if(document.getElementById('inp_print_certificate').checked){
+				document.getElementById('tr_inp_print_date_certificate').style.display = '';
+				document.getElementById('tr_inp_once_print').style.display = '';
+				
+				var printstardate = document.getElementById('inp_trnevent_enableprintcertificate').value;
+				if(printstardate != 'Y'){
+				    var eventenddate = new Date(document.getElementById('inp_trnevent_enddate').value);
+
+                    var lastprintdate = new Date(eventenddate.getFullYear(), eventenddate.getMonth()+1, eventenddate.getDate()+7);
+                
+                    var month = eventenddate.getMonth()+1;
+                    var day = eventenddate.getDate();
+                    var year = eventenddate.getFullYear();
+                
+                    var lastmonth = lastprintdate.getMonth();
+                    var lastday = lastprintdate.getDate();
+                    var lastyear = lastprintdate.getFullYear();
+                
+                    if (month &lt; 10){
+                        month = "0"+month;
+                    }
+                    if (day &lt; 10){
+                        day = "0"+day;
+                    }
+                
+                    if (lastmonth &lt; 10){
+                        lastmonth = "0"+lastmonth;
+                    }
+                    if (lastday &lt; 10){
+                        lastday = "0"+lastday;
+                    }
+                
+                    document.getElementById('cal_Printcertificate_startdate').value = dateFormatMask(month+ "/"+day+"/" + year,"mm/dd/yyyy","#REQUEST.config.date_input_format#");
+                    document.getElementById('inp_Printcertificate_startdate').value = dateFormatMask(month+ "/"+day+"/" + year,"mm/dd/yyyy","mm/dd/yyyy");
+                    document.getElementById('cal_Printcertificate_enddate').value = dateFormatMask(lastmonth +"/"+ lastday+"/" + lastyear,"mm/dd/yyyy","#REQUEST.config.date_input_format#");
+                    document.getElementById('inp_Printcertificate_enddate').value = dateFormatMask(lastmonth +"/"+ lastday+"/" + lastyear,"mm/dd/yyyy","mm/dd/yyyy");
+				}
+			}
+			else{
+				document.getElementById('tr_inp_print_date_certificate').style.display = 'none';
+				document.getElementById('tr_inp_once_print').style.display = 'none';
+			}
+		}
+		
+		function editenableagreement(){
+			if(document.getElementById('inp_trnevent_agreement').checked){
+				document.getElementById('tr_inp_trnevent_validagreement').style.display = '';
+			}
+			else{
+				document.getElementById('tr_inp_trnevent_validagreement').style.display = 'none';
+			}
+		}
+		
+		function initFunc(){
+			//document.getElementById('inp_chk_filter').disabled = document.getElementById('inp_chk_filter').checked == false ? true : false;
+			/*kalau tidak ada related jobtitlenya chk_filter hidden */
+			statjob = document.getElementById('inp_jobtitlestat').value;
+			titleval = "none";
+			if(statjob != '1'){
+				document.getElementById('tr_inp_chk_filter').style.display = 'none';
+			}
+			if(statjob == '1'){
+				$("input[name=inp_chk_filter][value="+titleval+"]").attr('checked', true);
+			}
+			if(document.getElementById('inp_hdn_nametype').value == 'INTERNAL'){
+				povty = "INTERNAL";
+				$("input[name=inp_nametype][value="+povty+"]").attr('checked', true);
+			}
+			else{
+				povty = "EXTERNAL";
+				$("input[name=inp_nametype][value="+povty+"]").attr('checked', true);
+			}
+			
+			editenableagreement();
+			editenablecertified();
+			enabledprintcertificate();
+		//  editenableevaluation();
+		//  editenablefeedback();
+		//  editenablecon();
+		//  editenablereq();
+			removeclick();
+		}
+		initFunc();
+		
+
+		function gethdnlistmember()
+		{
+			var trnevent_code = document.getElementById('inp_trnevent_code').value;
+			var listmember = getAJAXContent("?ofid=TrainingEventParticipant.getHdnSelMember&amp;trnevent_code="+trnevent_code,$sf("hdnSelectedinp_group_emp"));
+			var selMember = document.getElementById('hdnSelectedinp_group_emp').value;
+		}
+	
+		function validateDateOnEvent(){
+				var okAllDate = true;
+				var retValidateCertDate1 = true;
+				var retValidateAgreeDate1 = true;
+				if(document.getElementById('inp_trnevent_enablecertified').checked){
+					 retValidateCertDate1 = date_compare(document.getElementById('cal_trnevent_startdate'),document.getElementById('cal_trnevent_validcertified'));
+				} 
+				if(document.getElementById('inp_trnevent_agreement').checked){
+					 retValidateAgreeDate1 = date_compare(document.getElementById('cal_trnevent_startdate'),document.getElementById('cal_trnevent_validagreement'));
+				}
+				if(parseInt(retValidateCertDate1) == 2){
+					alert("[SFTEXT:ERValid Certified Thru Date must be greater than or equal to Training Event Start Date]");
+					$('##cal_trnevent_validcertified').focus();
+				}  
+				if(parseInt(retValidateAgreeDate1) == 2){
+					alert("[SFTEXT:ERValid Service Aggrement Thru Date must be greater than or equal to Training Event Start Date]");
+					$('##cal_trnevent_validagreement').focus();
+				}           
+				
+				if(parseInt(retValidateCertDate1)==2 || parseInt(retValidateAgreeDate1) == 2){
+					okAllDate = false;
+				}
+				return okAllDate;
+		}
+		function populateParticipant(){
+				var amtEmp = document.getElementById("selinp_group_emp").length;
+				document.getElementById("inp_listempselect").value =  '';
+				for(i=0;i[lt]amtEmp;i++){
+					var selValue=  document.getElementById("selinp_group_emp").options[i].value;
+					if(document.getElementById("inp_listempselect").value !== ''){
+						document.getElementById("inp_listempselect").value = document.getElementById("inp_listempselect").value + ',' + selValue;
+					}else{
+						document.getElementById("inp_listempselect").value = document.getElementById("inp_listempselect").value + selValue;
+					}
+				}
+		}
+
+		function validateOther() {
+			populateParticipant();
+			
+			var rowtotActivity = document.getElementById("hdn_idx").value;
+			var arrActivity = [];
+			for(var ii=1; ii &lt;= rowtotActivity; ii++){
+			    arrActivity.push(document.getElementById("cal_trnplan_startdate"+ii).value);
+			}
+			
+			/*alert(validateOtheragenda()+", "+validateDateOnEvent()+", "+validateOtherEss()+", "+validateOtherEss()+", "+validateOthercost()+", "+document.getElementById("inp_trnevent_sts").value+", "+document.getElementById("inp_trnevent_sts").disabled);*/
+			var valreturn = true;
+			try {
+			        if(validateOtheragenda()==false){
+						valreturn = false;
+					}
+					/*else if(document.getElementById("inp_listempselect").value=='' &amp;&amp; !(document.getElementById("inp_trnevent_sts").value==2 || document.getElementById("inp_trnevent_sts").value==1) ){
+						valreturn = false;
+						alert("[SFTEXT:JSPleaseSelectEmployeeOnTabParticipant]");
+						$('##selinp_group_emp').focus();
+					}*/ 
+					else if(document.getElementById("selinp_group_emp").length > parseInt(document.getElementById('inp_trnevent_capacity').value) ){
+						valreturn = false;
+						alert("[SFTEXT:Youhaveexceededmaximumnumberofparticipant]");
+					}else if(validateDateOnEvent()==false){
+						 valreturn = false;
+					}else if(validateOtherEss()==false){
+					    valreturn = false;
+					}else if(validateOthercost()==false){
+					    valreturn = false;
+					} else
+					if(document.getElementById("inp_trnevent_sts").value==4){
+        			    if(document.getElementById("inp_trnevent_sts").disabled != true){
+        			        var endDate =  new Date(document.getElementById('inp_trnevent_enddate').value);
+            				var nowDate = new Date(Date.now());
+            				
+            				if(nowDate &lt; endDate){
+            				    var r = confirm("[SFTEXT:JSAre you sure to set conclude this training event status?]");
+                                if (r == true) {
+            			            valreturn = true;
+                                } else {
+            			            valreturn = false;
+                                }
+            				}
+        				}
+        			} else 
+        			if(findDuplicates(arrActivity) != ''){
+        			    alert("[SFTEXT:JSActivity Date Cannot Be The Same Each Other]");
+        			    valreturn = false;  
+        			}
+			}
+			catch(err) {
+				 valreturn = validateDateOnEvent();
+			}
+			//valreturn = false;
+			return valreturn;
+		}
+		
+		function findDuplicates(arry){
+    		var object = {};
+            var result = [];
+    
+            arry.forEach(function (item) {
+              if(!object[item])
+                  object[item] = 0;
+                object[item] += 1;
+            })
+    
+            for (var prop in object) {
+               if(object[prop] &gt;= 2) {
+                   result.push(prop);
+               }
+            }
+    
+            return result;
+        }
+		
+		setTimeout(function x(){document.getElementById('inp_trnevent_address').value = document.getElementById('inp_hdn_temp_addr').value;},3000); 
+		
+		function chkFilterJob(){
+			if(parent.document.getElementById('divBlockSpace'))parent.document.getElementById('divBlockSpace').style.display = '';
+			if(parent.document.getElementById('divBlock'))parent.document.getElementById('divBlock').style.display = '';
+			searchFilter(null,'?ofid=TrainingEvent.filterEmployee','inp_group_emp',10000);
+		}
+		
+		function viewImdtResignEmp()
+		{
+			var selected_emp = document.frmtrneventedit.hdnSelectedinp_group_emp.value;
+			var thisform = document.frmtrneventedit;
+			var sLink = sLink="?xfid=hrm.training.event.viewimdtresignemp&amp;selected_lstemployee="+selected_emp;
+			thisform.target = "popReport";
+			popWindow("",thisform.target,600,400,"scrollbars=yes,resizable=yes,location=no,status=yes");
+			thisform.action = sLink;
+			thisform.submit();
+			
+			getAJAXContent("?ofid=TrainingEventParticipant.getImmediateResignEmpx&amp;selected_lstemployee="+selected_emp,$sf("spAjax"));
+		}
+		
+		// ENC50917-81140
+		function viewWaitingListEmp()
+		{
+		
+			var selected_emp = document.frmtrneventedit.hdnSelectedinp_group_emp.value;
+			var trnevent_code = document.getElementById('inp_trnevent_code').value;
+			var trncourse_code = document.getElementById('inp_hdn_trncourse_code').value;
+
+			var thisform = document.frmtrneventedit;
+			var sLink="?xfid=hrm.training.event.viewwaitinglist&amp;selected_lstemployee="+document.getElementById('hdnSelectedinp_group_emp').value+"&amp;trnevent_code="+trnevent_code+"&amp;trncourse_code="+trncourse_code;
+			thisform.target = "popReport";
+			popWindow("",thisform.target,600,400,"scrollbars=yes,resizable=yes,location=no,status=yes");
+			thisform.action = sLink;
+			thisform.submit();
+			
+			// getAJAXContent("?ofid=TrainingEventParticipant.getImmediateResignEmpx&amp;selected_lstemployee="+selected_emp,$sf("spAjax"));
+		}
+		// /ENC50917-81140
+
+		/*End Other Javascript */
+			cekTrnStatus();
+			
+		
+		var disble = false;
+		var xx = 0;
+		//Function Remove Click untuk Selected Participant jika Statusnya Concluded
+		function removeclick(){
+			/*if(!disble){
+				if(document.frmtrneventedit.inp_hdntrnevent_status.value==4){
+					document.getElementById('selinp_group_emp').removeAttribute("ondblclick");
+					$('[id=tr_inp_group_emp]').find('input[type=button]').each(function(){
+					    console.log(this.value)
+					    if(trim(this.value) == '«') 
+					        $(this).removeAttr('onclick')   
+					});
+				}
+			}*/
+			var lstempid = document.getElementById("inp_listattparticipant").value;
+			$("##selinp_group_emp option").each(function(a,b){
+                if (lstempid.includes(b.value)){
+                    b.disabled = true;
+                }
+                disble = true
+                xx++;
+            });
+			if(lstempid != ''){
+				 if (disble &amp; xx &lt;= 2){
+					alert("[SFTEXT:Some participant already have attendance data]"); 
+					$("##selinp_group_emp")[0].selectedIndex = '99999';
+					disble = false
+				}
+			}
+           
+		}
+		$("##selinp_group_emp").click(function(){removeclick()})
+		
+		
+		
+		//Function Check Total Selected Participant dengan Total Capacity Participan
+		var temparr = [];
+        function removeclickAddParticipant(){
+		    var a = $("##selinp_group_emp > option").length
+            var b = $("##inp_trnevent_capacity").val()
+            if ( a == b ){
+            	//console.log("Kasih Alert / Tanda Bahwa Tidak bisa menambahkan Participant lagi karena Capacity Employee Training Sudah Maksimal dan juga hapus / ganti function doubleclicknya untuk memindahkan ke kanan");
+				hapusfunction();
+            }
+			else if(a > b){
+				hapusfunction();
+				//console.log(temparr);
+			}
+			else{
+            	//console.log("Jika Training Capacity lebih besar drpd total Employee yang di pilih, maka kembalikan fungsi2 yang di hapus")
+            	if (!$("##unselinp_group_emp").attr("ondblclick"))
+            		$("##unselinp_group_emp").attr("ondblclick", "onAddParticipant()");
+				
+				$('[id=tr_inp_group_emp]').find('input[type=button]').each(function(){
+					if(trim(this.value) == '»') {
+						if(!$(this).attr("onclick"))
+							$(this).attr('onclick',"onAddParticipant()");
+					}
+				});
+                
+                $("##lblmax").remove();
+                if (!disble){
+					//Kembalikan function moveselect
+					if (!$("##selinp_group_emp").attr("ondblclick"))
+						$("##selinp_group_emp").attr("ondblclick", "onRemoveParticipant()()");
+					
+					$('[id=tr_inp_group_emp]').find('input[type=button]').each(function(){
+						if(trim(this.value) == '«') {
+							if(!$(this).attr("onclick"))
+								$(this).attr('onclick',"onRemoveParticipant()()");
+						}
+					});
+					
+					if(document.frmtrneventedit.inp_hdntrnevent_status.value==4){
+					    $("##selinp_group_emp option").prop('disabled', true);
+					    $("##selinp_group_emp")[0].selectedIndex = '99999';
+					}
+				}
+				disble = true;
+            }
+        }
+		
+		function hapusfunction(){
+			document.getElementById('unselinp_group_emp').removeAttribute("ondblclick");
+			$('[id=tr_inp_group_emp]').find('input[type=button]').each(function(){if(trim(this.value) == '»') $(this).removeAttr('onclick')   });
+			if ($("##lblmax").length == 0)
+                addLabelCondition();
+		}
+        $("##unselinp_group_emp").click(function(){removeclickAddParticipant()})
+        
+        //Function Add Label
+        function addLabelCondition(){
+            var a = false;
+            $("##tabcontent_4").find("table").each(function() {	
+            $(this).find("tr ##tdb_1").each(function() {
+            	$(this).find("input[type=text]").each(function(){
+            		if(this.id == 'inp_trnevent_capacity'){
+            			a = true;
+                    }
+                });
+            	if (a){
+                    $(this).append("  &lt;small id='lblmax'&gt;&lt;font color='red'&gt;Maximum Capcity&lt;/font&gt;&lt;/small&gt;");
+            		a = false;
+                }
+            })
+            });
+        }
+
+        // !--- override moveselect participant ---
+        var origmoveSelect = moveSelect;
+        moveSelect = function(a,b,c) {
+            var retvar = origmoveSelect(a,b,c);
+            
+			var hdn_empfromWaiting = document.getElementById("inp_listempfromwaitinglist");
+			var arrayFromWaiting = hdn_empfromWaiting.value.split(",");
+
+			var hdn_empfromWaiting = document.getElementById("hdnSelectedinp_group_emp");
+			var arrayFromSelected = hdn_empfromWaiting.value.split(",");
+			
+            arrayFromWaiting = arrayFromWaiting.filter( function( el ) {
+              return arrayFromSelected.includes( el );
+            } );
+            
+            $('[id=inp_listempfromwaitinglist]').val(arrayFromWaiting.join(','));
+             
+            return retvar;
+        }
+        
+
+		
+		</SCRIPT>
+		
+	</SFFORM>
+</SFPAGE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

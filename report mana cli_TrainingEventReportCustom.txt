@@ -1,0 +1,80 @@
+content:
+[set:objTraining:{CreateObject(&quot;component&quot;, &quot;SFTrainingReport&quot;)}] [set:callOutput:{objTraining.rptTrainingEventCustom()}] <strong>
+<div style="font-style: italic; font-family: Arial, Helvetica, sans-serif; font-size: 8px">[query:qEmployeeName: SELECT DISTINCT getname emp_nameprint from VIEW_EMPLOYEE_STS WHERE emp_id ='{REQUEST.Scookie.User.EMPID}'] <br />
+[loop:query:qEmployeeName] [sftext:Printedon] : {DateFormat(now(),Application.config.date_output_format)} {TimeFormat(now(),Application.config.time_format)} <br />
+[sftext:Printedby] : {emp_nameprint} [/loop:qEmployeeName]</div>
+</strong>
+
+
+filter conf:
+<INPUT LABEL="Training Date" TYPE="DATE" NAME="startdate" PARAM="startdate" DATECOMPARE="enddate" GROUP="tanggal" REQUIRED="YES" ERRMSG="Please choose starting date" ONCHANGE="return eventOnLoadCourse(); return cekBoxAllStatus();"/>
+<INPUT LABEL="To" NAME="enddate" TYPE="DATE" PARAM="enddate" GROUP="tanggal~" REQUIRED="YES" ERRMSG="Please choose end date" ONCHANGE="return eventOnLoadCourse();return cekBoxAllStatus();"/>
+<INPUT LABEL="Provider Type" NAME="nametype" PARAM="trnevent_type" TYPE="RADIO" OPTIONS="INTERNAL*=Internal|EXTERNAL=External" ONCLICK="eventOnLoadCourse();return cekBoxAllStatus();" />
+<INPUT LABEL="Training Event Status" NAME="trnevent_sts" PARAM="trnevent_sts" ONCHANGE="eventOnLoadCourse();return cekBoxAllStatus();" TYPE="SELECT" LISTSOURCE="TrainingEvent.refstatus" />
+
+<INPUT LABEL="Training Event" NAME="allcourse" PARAM="allcourse" TYPE="CHECKBOX" ONCLICK="cekAllCourse();" OPTIONS="1=All Event"/>
+<INPUT LABEL="" TYPE="FILTER" ROW="10" MAXROW="10000" NAME="course" PARAM="course" LISTSOURCE="TrainingReport.filterEventForEventReport" REQUIRED="YES" ERRMSG="Please choose training event" />
+
+<INPUT LABEL="Approver 1" NAME="empid1" TYPE="SUGGEST" LISTSOURCE="TrainingEvent.getEmpIDbyEmpName" PARAM="fullname" />
+<INPUT LABEL="Approver 2" NAME="empid2" TYPE="SUGGEST" LISTSOURCE="TrainingEvent.getEmpIDbyEmpName" PARAM="fullname" />
+<INPUT LABEL="Approver 3" NAME="empid3" TYPE="SUGGEST" LISTSOURCE="TrainingEvent.getEmpIDbyEmpName" PARAM="fullname"/>
+<INPUT LABEL="Approver 4" NAME="empid4" TYPE="SUGGEST" LISTSOURCE="TrainingEvent.getEmpIDbyEmpName" PARAM="fullname"/>
+
+
+filter scrip:
+function TotDayInMonth(intMonth,intYear)
+{
+if((intMonth == 1) || (intMonth == 3) || (intMonth == 5) || (intMonth == 7) || (intMonth == 8) || (intMonth == 10) || (intMonth == 12))
+return 31;
+else if ((intMonth == 4) || (intMonth == 6) || (intMonth == 9) || (intMonth == 11))
+return 30;
+else if (intMonth == 2)
+return (((intYear % 4) == 0) ? 29 : 28);
+}
+function initdate(){
+var currentTime = new Date();
+var month = currentTime.getMonth() + 0;
+var nextmonth = currentTime.getMonth() + 1;
+var day = currentTime.getDate();
+var year = currentTime.getFullYear();
+if (month < 10){
+month = "0"+month;
+}
+if (day < 10){
+day = "0"+day;
+}
+if (nextmonth < 10){
+nextmonth = "0"+nextmonth;
+}
+document.getElementById('cal_startdate').value = dateFormatMask(nextmonth+ "/01/" + year,"mm/dd/yyyy","#REQUEST.config.date_input_format#");
+document.getElementById('inp_startdate').value = dateFormatMask(nextmonth+ "/01/" + year,"mm/dd/yyyy","mm/dd/yyyy");
+
+document.getElementById('cal_enddate').value = dateFormatMask(nextmonth +"/"+ TotDayInMonth(nextmonth,year)+"/" + year,"mm/dd/yyyy","#REQUEST.config.date_input_format#");
+document.getElementById('inp_enddate').value = dateFormatMask(nextmonth +"/"+ TotDayInMonth(nextmonth,year)+"/" + year,"mm/dd/yyyy","mm/dd/yyyy");
+}
+function eventOnLoadCourse(){
+	document.getElementById('selinp_course').options.length = null;
+	searchFilter(null,'?ofid=TrainingReport.filterEventForEventReport','inp_course',10000);
+}
+
+function cekAllCourse(){
+	if(document.getElementById('inp_allcourse').checked == true) {
+	 document.getElementById('tr_inp_course').style.display = 'none';
+	}
+	else {
+	document.getElementById('tr_inp_course').style.display = '';
+	}
+}
+
+function cekBoxAllStatus(){
+	if(document.getElementById("inp_coursesel").value == ""){
+		document.getElementById('inp_allcourse').disabled = true;
+		document.getElementById('inp_allcourse').checked = false;
+	} else {
+		document.getElementById('inp_allcourse').disabled = false;
+	}
+}
+
+initdate();
+eventOnLoadCourse();
+cekBoxAllStatus();

@@ -1,0 +1,222 @@
+content:
+<div class="titleReport" style="margin-bottom: 5px" align="center"><span style="font-size: larger;"><strong> </strong><span style="font-size: medium;"><strong>[sftext:MBO Monitoring and Evaluation Report]</strong></span></span></div>
+<div style="text-align: left;"><br />
+[set:objPMReport:{CreateObject(&quot;component&quot;, &quot;SFPerformReport&quot;)}] [set:callOutput:{objPMReport.MBOReport()}]</div>
+<strong>
+<div style="font-style: italic; font-family: Arial, Helvetica, sans-serif; font-size: 8px">[query:qEmployeeName: SELECT DISTINCT getname emp_nameprint from VIEW_EMPLOYEE_STS WHERE emp_id ='{REQUEST.Scookie.User.EMPID}'] <br />
+[loop:query:qEmployeeName] [sftext:Printed] [sftext:on] : {DateFormat(now(),Application.config.date_output_format)} {TimeFormat(now(),Application.config.time_format)}<br />
+[sftext:Printed] [sftext:by] : {emp_nameprint} [/loop:qEmployeeName]</div>
+</strong>
+
+
+filter conf:
+<INPUT LABEL="~" NAME="ListPerformPeriod" PARAM="ListPerformPeriod" TYPE="HIDDEN"/>
+<INPUT LABEL="Performance Period" NAME="perform_period" PARAM="perform_period" TYPE="CHECKBOX" OPTIONS="Y=All" ONCLICK="all_performperiod()"/>
+<!--<INPUT LABEL="" TYPE="FILTER" ROW="10" MAXROW="10000" NAME="period_code" PARAM="period_code" LISTSOURCE="PerformancePeriod.filterPerformancePeriodMBO" REQUIRED="YES" ERRMSG="Please choose Performance Period" ONCHANGE="actionChangeLstPeriod()" />-->
+<INPUT LABEL="" TYPE="FILTER" ROW="10" MAXROW="10000" NAME="period_code" PARAM="period_code" LISTSOURCE="PerformancePeriod.filterPerformancePeriod" REQUIRED="YES" ERRMSG="Please choose Performance Period" ONCHANGE="actionChangeLstPeriod()" />
+
+<INPUT LABEL="Stage" TYPE="RADIO" NAME="stage" PARAM="stage" OPTIONS="planning=PMRPlanning|evaluation*=Evaluation" ONCHANGE="onPeriodChange()"/>
+
+<INPUT LABEL="~" NAME="hdnListEmp" PARAM="hdnListEmp" TYPE="HIDDEN"/>
+<INPUT LABEL="Employee" NAME="emp" PARAM="emp" TYPE="CHECKBOX" OPTIONS="Y=All" ONCLICK="empfilter();"/>
+<!--<INPUT LABEL="~" TYPE="FILTEREMPLOYEE" REQUIRED="Yes" ERRMSG="Please Select Employee" FILTERADDON="EMPNOLIST" LISTSOURCE="PerformancePeriod.filterEmployeeTechMBO" NAME="emp_id" PARAM="emp_id" INCLUSIVE="param"/>-->
+<INPUT LABEL="~" TYPE="FILTEREMPLOYEE" REQUIRED="Yes" ERRMSG="Please Select Employee" FILTERADDON="EMPNOLIST" LISTSOURCE="PerformancePeriod.filterEmployeeTech" NAME="emp_id" PARAM="emp_id" INCLUSIVE="param"/>
+
+
+filter script:
+lstPeriodHaveQuestionComp = '';
+
+function validateOther() {
+ // var rdtype = eval("frmSFReport." + inprefix + "report_type");
+ // var rdtype1 = eval("frmSFReport." + inprefix + "report_model");
+
+ // for (var j = 0; j < rdtype.length; j++) {
+ // if (rdtype[j].checked) {
+ // rdtype = rdtype[j].value;
+ // break;
+ // }
+ // }
+ // if (rdtype == 'FinalScoreDetail') {
+ // for (var j = 0; j < rdtype1.length; j++) {
+ // if (rdtype1[j].checked) {
+ // rdtype = rdtype1[j].value;
+ // break;
+ // }
+ // }
+ // }
+ // if (rdtype == "FinalScoreDetHor") {
+ // sLink = "?rpid=PerfScoreReportDetHor";
+
+ // return true;
+ // } else {
+ // sLink = "?rpid=PerfScoreReport";
+
+ // return true;
+ // }
+ sLink = "?rpid=cli_mbo"
+ return true;
+}
+
+function TotDayInMonth(intMonth, intYear) {
+ if ((intMonth == 1) || (intMonth == 3) || (intMonth == 5) || (intMonth == 7) || (intMonth == 8) || (intMonth == 10) || (intMonth == 12))
+ return 31;
+ else if ((intMonth == 4) || (intMonth == 6) || (intMonth == 9) || (intMonth == 11))
+ return 30;
+ else if (intMonth == 2)
+ return (((intYear % 4) == 0) ? 29 : 28);
+}
+/*
+function initdate() {
+ var currentTime = new Date();
+ var month = currentTime.getMonth() + 0;
+ var nextmonth = currentTime.getMonth() + 1;
+ var day = currentTime.getDate();
+ var year = currentTime.getFullYear();
+ if (month < 10) {
+ month = "0" + month;
+ }
+ if (day < 10) {
+ day = "0" + day;
+ }
+ if (nextmonth < 10) {
+ nextmonth = "0" + nextmonth;
+ }
+ document.getElementById('cal_startdt').value = dateFormatMask("01/01/" + year, "mm/dd/yyyy", "#request.config.date_input_format#");
+ document.getElementById('cal_enddt').value = dateFormatMask(nextmonth + "/" + TotDayInMonth(nextmonth, year) + "/" + year, "mm/dd/yyyy", "#request.config.date_input_format#");
+}
+initdate();
+*/
+/*
+function EditEmpList() {
+ document.getElementById('selinp_emp_id').options.length = null;
+ searchFilter(null, '?ofid=PerformancePeriod.filterEmployeeTechMBO', 'inp_emp_id', 10000);
+}*/
+
+function ReportContent() {
+ var radios = document.getElementsByName('inp_report_type');
+ for (var i = 0, length = radios.length; i < length; i++) {
+ if (radios[i].checked) {
+ if (radios[i].value == "FinalScoreDetail") {
+ document.getElementById('tr_inp_report_content').style.display = "";
+ document.getElementById('tr_inp_report_model').style.display = "";
+ checkIsPeriodContain();
+ } else {
+ document.getElementById('tr_inp_report_content').style.display = "none";
+ document.getElementById('tr_inp_report_model').style.display = "none";
+ isPeriodContainQuestion(false);
+ }
+ }
+ }
+}
+
+function empfilter() {
+ if (document.getElementById('inp_emp').checked || document.getElementById('inp_emp_id').checked === 'true') {
+ document.getElementById('tr_inp_emp_id').style.display = 'none';
+ $("##inp_hdnListEmp").val($.merge($.map($("select[name='unselinp_emp_id']>option"), function (e) {
+ return e.value;
+ }), $.map($("select[name='selinp_emp_id']>option"), function (e) {
+ return e.value;
+ })).join(","));
+ } else {
+ document.getElementById('tr_inp_emp_id').style.display = '';
+ $("##inp_hdnListEmp").val($.map($("select[name='selinp_emp_id']>option"), function (e) {
+ return e.value;
+ }).join(","));
+ }
+}
+ReportContent();
+
+function all_performperiod() {
+ if (document.getElementById('inp_perform_period').checked || document.getElementById('inp_perform_period').checked == 'true') {
+ document.getElementById('tr_inp_period_code').style.display = 'none';
+ } else {
+ document.getElementById('tr_inp_period_code').style.display = '';
+ }
+ EditEmpList();
+ setAllPeriodCheck();
+}
+$('[id=inp_report_type],[id=inp_report_model]').click(function () {
+ checkShowNotesBtn();
+});
+
+function checkShowNotesBtn() {
+ var valRepType = $('[name=inp_report_type]:checked').val();
+ var valRepModel = $('[name=inp_report_model]:checked').val();
+ if (valRepType == 'FinalScoreDetail' && valRepModel == 'FinalScoreDetVer') {
+ $('[id=tr_inp_show_notes]').show();
+ } else {
+ $('[id=tr_inp_show_notes]').hide();
+ $("[id=inp_show_notes]").prop("checked", false);
+ }
+}
+checkShowNotesBtn();
+
+function isPeriodContainQuestion(isyes) {
+ var reporttype = $('[name=inp_report_type]:checked').val();
+ if (isyes && reporttype == 'FinalScoreDetail') {
+ $('[id=tr_inp_show_question]').show();
+ checkShowQuestionDet();
+ } else {
+ $('[id=tr_inp_show_question]').hide();
+ $('[id=tr_inp_submitted_question_only]').hide();
+ $('[id=tr_inp_show_rater_name]').hide();
+ }
+}
+
+function checkShowQuestionDet() {
+ var reporttype = $('[name=inp_report_type]:checked').val();
+ if ($('[id=inp_show_question]:checked').val() == 'Y' && reporttype == 'FinalScoreDetail') {
+ $('[id=tr_inp_submitted_question_only]').show();
+ $('[id=tr_inp_show_rater_name]').show();
+ } else {
+ $('[id=tr_inp_submitted_question_only]').hide();
+ $('[id=tr_inp_show_rater_name]').hide();
+ }
+}
+isPeriodContainQuestion(false);
+var origmoveSelect = moveSelect;
+moveSelect = function (a, b, c) {
+ origmoveSelect(a, b, c);
+ var tempShow = false;
+ var stuffArray = lstPeriodHaveQuestionComp.split(",");
+ var selectedPeriod = $('[id=hdnSelectedinp_period_code]').val();
+ var arrSelectedPeriod = selectedPeriod.split(",");
+ $.each(arrSelectedPeriod, function (key, value) {
+ var index = $.inArray(value, stuffArray);
+ if (index != -1) {
+ tempShow = true;
+ }
+ });
+ return isPeriodContainQuestion(tempShow);
+}
+
+function checkIsPeriodContain() {
+ var tempShow = false;
+ var stuffArray = lstPeriodHaveQuestionComp.split(",");
+ var selectedPeriod = $('[id=hdnSelectedinp_period_code]').val();
+ var arrSelectedPeriod = selectedPeriod.split(",");
+ $.each(arrSelectedPeriod, function (key, value) {
+ var index = $.inArray(value, stuffArray);
+ if (index != -1) {
+ tempShow = true;
+ }
+ });
+ return isPeriodContainQuestion(tempShow);
+}
+
+/*
+function setAllPeriodCheck() {
+ document.getElementById('selinp_period_code').options.length = null;
+ searchFilter(null, '?ofid=PerformancePeriod.filterPerformancePeriodMBO', 'inp_period_code', 10000);
+}
+*/
+function setAllPeriodCheck() {
+ document.getElementById('selinp_period_code').options.length = null;
+ searchFilter(null, '?ofid=PerformancePeriod.filterPerformancePeriod', 'inp_period_code', 10000);
+}
+
+function onPeriodChange(){
+ //searchFilter(null,'?ofid=PerformancePeriod.filterEmployeeTech','inp_empid',10000,getPeriodStatus);
+document.getElementById('selinp_emp_id').options.length = null;
+		searchFilter(null,'?ofid=PerformancePeriod.filterEmployeeTech','inp_emp_id',10000);
+}

@@ -1,0 +1,32 @@
+CREATE TABLE `tctmdelivmethod` (
+  `code` varchar(50) NOT NULL,
+  `name_en` varchar(50) NOT NULL,
+  `name_id` varchar(50) NOT NULL,
+  `name_my` varchar(50) NOT NULL,
+  `name_th` char(30) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `order_no` int(11) DEFAULT NULL,
+  `created_date` datetime(3) NOT NULL,
+  `created_by` varchar(50) NOT NULL,
+  `modified_date` datetime(3) NOT NULL,
+  `modified_by` varchar(50) NOT NULL,
+  PRIMARY KEY (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+
+CREATE TABLE `tctmevalmethod` (
+  `code` varchar(50) NOT NULL,
+  `name_en` varchar(50) NOT NULL,
+  `name_id` varchar(50) NOT NULL,
+  `name_my` varchar(50) NOT NULL,
+  `name_th` char(30) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `order_no` int(11) DEFAULT NULL,
+  `created_date` datetime(3) NOT NULL,
+  `created_by` varchar(50) NOT NULL,
+  `modified_date` datetime(3) NOT NULL,
+  `modified_by` varchar(50) NOT NULL,
+  PRIMARY KEY (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+
+INSERT INTO tgecmasterdata (table_name,table_desc,module,created_date,created_by,modified_date,modified_by) VALUES 
+('TCTMDELIVMETHOD','Training Delivery Method','Training','2020-11-26 10:50:59.586','','2020-11-26 10:50:59.586','')
+,('TCTMEVALMETHOD','Training Evaluation Method','Training','2020-11-26 10:50:59.586','','2020-11-26 10:50:59.586','')
+;
