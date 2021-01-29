@@ -22,12 +22,14 @@
 		<cfparam name="hdn_trnevent_attachment" default="">
 		<!--- Muadz nambahin yang buat diinsert --->
 		<cfparam name="seldelivmethod" default="">
+		<cfparam name="delivmethod" default="">
+		<cfparam name="hdnSelecteddelivmethod" default="">
 		<cfparam name="evalmethod" default="">
 		<cfparam name="acceptcriteria" default="">
 		<cfparam name="material" default="">
 		<!--- Muadz nambahin yang buat diinsert --->
 		<cfoutput>
-		#seldelivmethod# koma
+		#delivmethod# koma
 		#evalmethod# koma
 		#acceptcriteria# koma
 		#material# 
@@ -95,6 +97,7 @@
 			WHERE trnevent_code = <cfqueryparam value="#trnevent_code#" cfsqltype="CF_SQL_VARCHAR"> 
 			AND company_code = <cfqueryparam value="#company_code#" cfsqltype="CF_SQL_VARCHAR">
 		</cfquery>
+		<cfdump  var="#LOCAL.qSelectInfo#" label="98">
 		<cfset LOCAL.strckData = FORM />
 		<cfset LOCAL.strckDataEventInfo = StructNew() />
 		<cfset strckDataEventInfo['trnevent_code'] = #evaluate("trnevent_code")# />
@@ -104,7 +107,7 @@
 		<cfset strckDataEventInfo['trnevent_target'] = #evaluate("trnevent_target")# />
 		<cfset strckDataEventInfo['trnevent_remark'] = #evaluate("trnevent_remark")# />
 		<!--- muadz nambahin yang buat diinsert --->
-		<cfset strckDataEventInfo['delivmethod'] = #evaluate("seldelivmethod")# />
+		<cfset strckDataEventInfo['delivmethod'] = #evaluate("delivmethod")# />
 		<cfset strckDataEventInfo['evalmethod'] = #evaluate("evalmethod")# />
 		<cfset strckDataEventInfo['acceptcriteria'] = #evaluate("acceptcriteria")# />
 		<cfset strckDataEventInfo['material'] = #evaluate("material")# />
@@ -159,6 +162,8 @@
 		<cfparam name="trnevent_remark" default="">
 		<!--- Muadz nambahin yang buat diinsert --->
 		<cfparam name="seldelivmethod" default="">
+		<cfparam name="delivmethod" default="">
+		<cfparam name="hdnSelecteddelivmethod" default="">
 		<cfparam name="evalmethod" default="">
 		<cfparam name="acceptcriteria" default="">
 		<cfparam name="material" default="">
@@ -174,7 +179,7 @@
 		<cfset strckDataEventInfo['trnevent_target'] = #evaluate("trnevent_target")# />
 		<cfset strckDataEventInfo['trnevent_remark'] = #evaluate("trnevent_remark")# />
 		<!--- muadz nambahin yang buat diinsert --->
-		<cfset strckDataEventInfo['delivmethod'] = #evaluate("seldelivmethod")# />
+		<cfset strckDataEventInfo['delivmethod'] = #evaluate("hdnSelecteddelivmethod")# />
 		<cfset strckDataEventInfo['evalmethod'] = #evaluate("evalmethod")# />
 		<cfset strckDataEventInfo['acceptcriteria'] = #evaluate("acceptcriteria")# />
 		<cfset strckDataEventInfo['material'] = #evaluate("material")# />
@@ -195,6 +200,8 @@
 		<cfparam name="trnevent_remark" default="">
 		<!--- Muadz nambahin yang buat diinsert --->
 		<cfparam name="seldelivmethod" default="">
+		<cfparam name="delivmethod" default="">
+		<cfparam name="hdnSelecteddelivmethod" default="">
 		<cfparam name="evalmethod" default="">
 		<cfparam name="acceptcriteria" default="">
 		<cfparam name="material" default="">
@@ -275,7 +282,7 @@
 		<cfset strckDataEventInfo['trnevent_target'] = #evaluate("trnevent_target")# />
 		<cfset strckDataEventInfo['trnevent_remark'] = #evaluate("trnevent_remark")# />
 		<!--- muadz nambahin yang buat dihapus --->
-		<cfset strckDataEventInfo['delivmethod'] = #evaluate("seldelivmethod")# />
+		<cfset strckDataEventInfo['delivmethod'] = #evaluate("hdnSelecteddelivmethod")# />
 		<cfset strckDataEventInfo['evalmethod'] = #evaluate("evalmethod")# />
 		<cfset strckDataEventInfo['acceptcriteria'] = #evaluate("acceptcriteria")# />
 		<cfset strckDataEventInfo['material'] = #evaluate("material")# />

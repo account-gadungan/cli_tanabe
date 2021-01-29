@@ -67,9 +67,14 @@
 		<cfparam name="hdn_trnevent_attachment" default="">
 		<!--- Muadz nambahin yang buat diinsert --->
 		<cfparam name="seldelivmethod" default="">
+		<cfparam name="delivmethod" default="">
+		<cfparam name="hdnSelecteddelivmethod" default="">
 		<cfparam name="evalmethod" default="">
-		<cfparam name="acceptcriteria" default="">
+		<cfparam name="acceptcriteria" default="0">
 		<cfparam name="material" default="">
+		<cfdump  var="#seldelivmethod#" label='seldelmet'>
+		<cfdump  var="#hdnSelecteddelivmethod#" label='delmet'>
+		<!---<cfdump  var="#form#">--->
 		<!--- Muadz nambahin yang buat diinsert --->
 		<!---<cfdump  var="#hdnSelectedinp_delivmethod#"> --->
 		<!--- End Training Event Info --->
@@ -341,7 +346,7 @@
 		
 		<cfset LOCAL.objEventInfo= CreateObject("component", "SFTrainingEventInfo") />
 		<!--- Muadz nambahin yang buat dimasukin di struct --->
-		<cfset LOCAL.retVarInfo=objEventInfo.SaveInfo(trnevent_code,company_code,trnevent_bckground,trnevent_obj,trnevent_target,trnevent_remark,trnevent_attachment,hdn_trnevent_attachment,hdn_trncourse_code,trnevent_topic,nametype,trnevent_startdate,trnevent_enddate,trnevent_sts,hdn_provider_code,sel_cost_type,seldelivmethod,evalmethod,acceptcriteria,material)>
+		<cfset LOCAL.retVarInfo=objEventInfo.SaveInfo(trnevent_code,company_code,trnevent_bckground,trnevent_obj,trnevent_target,trnevent_remark,trnevent_attachment,hdn_trnevent_attachment,hdn_trncourse_code,trnevent_topic,nametype,trnevent_startdate,trnevent_enddate,trnevent_sts,hdn_provider_code,sel_cost_type,delivmethod,evalmethod,acceptcriteria,material)>
         <cfif listfindnocase(tabrowhide,"vistab_4",",")> 
 		    <cfset LOCAL.objEventParticipant= CreateObject("component", "SFTrainingEventParticipant") />
 		    <cfset LOCAL.retvarParticipant=objEventParticipant.SaveParticipant(trnevent_code,company_code,hdnSelectedgroup_emp,listemp,trnevent_capacity,emp,trnevent_startdate,trnevent_enddate,hdn_type,hdn_idx,hdn_idx2,hdn_idx3)>
@@ -1233,12 +1238,19 @@
 	</cffunction>--->
 
 	<cffunction  name="filterSelDelivMethod">
-		<cfquery name="LOCAL.qLookupRef" datasource="#REQUEST.SDSN#">
-			SELECT code optvalue, name_#REQUEST.SCOOKIE.LANG# opttext 
-			    FROM tctmdelivmethod
-			WHERE 1=1 
+		<cfquery name="qGetDelivMethod" datasource="#REQUEST.SDSN#">
+			SELECT delivmethod FROM ttrrtraineventinfo
+			WHERE trnevent_code = <cfqueryparam value="#trnevent_code#" cfsqltype="CF_SQL_VARCHAR">
+		</cfquery>
+
+		<cfquery name="qLookupRef" datasource="#REQUEST.SDSN#">
+			select code optvalue, name_en opttext
+			from tctmdelivmethod
+			where 1=1
 			order by opttext
 		</cfquery>
+
+		<!---<cfset qLookupRef = qGetDelivMethod.delivmethod> --->
 		
 		<cfif structKeyExists(URL,"techdebug") AND URL.techdebug eq "qLookupRef" >
 			<cfdump var="#qLookupRef#" label="qLookupRef-TechDev-Debug" expand='false'>
@@ -1278,6 +1290,7 @@
 			from tctmevalmethod
 			where 1=1
 		</cfquery>
+		<cfreturn qLookUp>
 	</cffunction>
 
 </cfcomponent>

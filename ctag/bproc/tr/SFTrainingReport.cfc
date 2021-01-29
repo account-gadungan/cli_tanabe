@@ -92,10 +92,10 @@
 			<cfloop list="#hdnSelectedinp_course#" item="item">
 				<cfquery name="qTrainingEvent" datasource="#request.sdsn#">		
 					select
-					a.trnevent_code,a.trnevent_topic,d.trncourse_name_#REQUEST.SCookie.LANG# course_name,a.trnevent_startdate,
-					a.trnevent_enddate, 
+					a.trnevent_code,a.trnevent_topic,d.trncourse_name_#REQUEST.SCookie.LANG# course_name,a.trnevent_startdate,a.trnevent_enddate, 
 					<!--- muadz nambahin background, obj, remark, target --->
-					(select name_en from ttrmtype where code=d.type_code) type_name, n.acceptcriteria, o.trnevent_enablecertified, p.cert_attach, n.trnevent_bckground,n.trnevent_obj,n.trnevent_remark,n.trnevent_target, n.delivmethod, n.evalmethod, n.material, r.score,
+					(select name_en from ttrmtype where code=d.type_code) type_name, n.acceptcriteria, o.trnevent_enablecertified, p.cert_attach, n.trnevent_bckground,n.trnevent_obj,n.trnevent_remark,n.trnevent_target, n.delivmethod, n.evalmethod, 
+					REPLACE(REPLACE(n.material, CHAR(13),'<br/>'),'  ', '&nbsp;nbsp;') material, r.score, a.request_no,
 					<!--- muadz nambahin background, obj, remark, target --->
 					(
 					select
@@ -389,11 +389,11 @@
 						<td>#isDefined("qHeaderEval") ? qHeaderEval.name_en: 'Not Available'#</td>
 					</tr>
 					<tr>
-						<td><strong>Acceptance Criteria: </strong></td>
+						<td><strong>Acceptance Criteria:</strong></td>
 						<td><strong>Certificate: </strong></td>
 					</tr>
 					<tr>
-						<td>#qTrainingEvent.acceptcriteria#</td>
+						<td>#qTrainingEvent.evalmethod neq '' and qTrainingEvent.evalmethod neq 'NOTAVAIL' ? qTrainingEvent.acceptcriteria : 'Not Available'#</td>
 						<td>#(qTrainingEvent.trnevent_enablecertified eq 'Y' ? 'Available' : 'Not Available')#</td>
 					</tr>
 					<tr>
@@ -762,6 +762,10 @@
 					select Full_Name,(select pos_name_en from teomposition where ve.pos_code=pos_code) dept_name from view_employee ve
 					where position_id = '372'
 				</cfquery>
+				<cfquery name="qGetInitiator" datasource="#request.sdsn#">
+					select Full_Name,(select pos_name_en from teomposition where ve.pos_code=pos_code) dept_name from view_employee ve
+					where emp_id = (select reqemp from tcltrequest t where req_no = <cfqueryparam value="#qTrainingEvent.request_no#" cfsqltype="CF_SQL_VARCHAR">)
+				</cfquery>
 
 				<!---
 					<cfif isDefined("hdn_empid4")>
@@ -809,30 +813,32 @@
 				<!---muadz table ttd--->
 				<table width="100%">
 					<tr>
+						<td style="text-align: center; width:16%;">Initiator</td>
 						<cfif inp_empid4 neq '' and inp_empid3 neq '' and inp_empid2 neq '' and inp_empid1 neq ''>
 							<cfset lastRow = 4>
 							<cfloop index="index" from="1" to="4">
-								<td style="text-align: center; width:19%;">Approver</td>
+								<td style="text-align: center; width:16%;">Approver</td>
 							</cfloop>
 						<cfelseif inp_empid3 neq '' and inp_empid2 neq '' and inp_empid1 neq ''>
 							<cfset lastRow = 3>
 							<cfloop index="index" from="1" to="3">
-								<td style="text-align: center; width:26%;">Approver</td>
+								<td style="text-align: center; width:19%;">Approver</td>
 							</cfloop>
 						<cfelseif inp_empid2 neq '' and inp_empid1 neq ''>
 							<cfset lastRow = 2>
 							<cfloop index="index" from="1" to="2">
-								<td style="text-align: center; width:39%;">Approver</td>
+								<td style="text-align: center; width:26%;">Approver</td>
 							</cfloop>
 						<cfelseif inp_empid1 neq ''>
 							<cfset lastRow = 1>
-							<td style="text-align: center; width:79%;">Approver</td>
+							<td style="text-align: center; width:39%;">Approver</td>
 						<cfelse>
 						</cfif>
-						<td style="text-align: center; width:19%;">Verify</td>
+						<td style="text-align: center; width:16%;">Verify</td>
 					</tr>
 					<tr><td>&nbsp;</td></tr><tr><td>&nbsp;</td></tr><tr><td>&nbsp;</td></tr><tr><td>&nbsp;</td></tr>
 					<tr>
+						<td style="text-align: center;"><u>#qGetInitiator.Full_Name#</u><br>#qGetInitiator.dept_name#</td>
 						<cfif isDefined("lastRow")>
 							<cfloop query="qGetApprover" startrow="1" endrow=#lastRow#>
 								<td style="text-align: center;"><u>#qGetApprover.Full_Name#</u><br>#qGetApprover.dept_name#</td>
