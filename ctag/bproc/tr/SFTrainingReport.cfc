@@ -660,15 +660,15 @@
 										<cfloop query="qInstructor">
 											<cfquery name="qGetInstructor" datasource="#request.sdsn#">
 												<cfif qInstructor.trnevent_type eq 'I'>
-													select Full_Name fn from view_employee where emp_id = '#instructor_code#'
+													select Full_Name fn, 'Internal' as type from view_employee where emp_id = '#instructor_code#'
 												<cfelse>
-													select instructor_name fn from ttrminstructor where instructor_code = '#instructor_code#'
+													select instructor_name fn, 'External' as type from ttrminstructor where instructor_code = '#instructor_code#'
 												</cfif>
 											</cfquery>
 											<cfif queryRecordCount(qInstructor) eq queryCurrentRow(qInstructor)>
-												#qGetInstructor.fn# (#qInstructor.trnevent_type#)
+												#qGetInstructor.fn# (#qGetInstructor.type#)
 											<cfelse>
-												#qGetInstructor.fn# (#qInstructor.trnevent_type#),<br>
+												#qGetInstructor.fn# (#qGetInstructor.type#),<br>
 											</cfif>
 										</cfloop>
 									</td>
