@@ -43,7 +43,7 @@
 						<INPUT LABEL="Target Participants" NAME="trnevent_target" PARAM="trnevent_target" TYPE="MEMO" COL="50" ROW="3" REQUIRED="YES" ERRMSG="Please Input Target Participants on the tab of General Info" MAXLEN="450"/>
 						<!-- muadz penambahan custom -->
 						<!--<INPUT LABEL="Delivery Method" NAME="delivmethod" PARAM="delivmethod" TYPE="FILTER" REQUIRED="Yes" LISTSOURCE="TrainingEvent.filterDelivMethod" LISTMEMBER="TrainingEvent.filterSelDelivMethod" ROW="10" MAXROW="100" ERRMSG="Please Select Delivery Method"/>-->
-						<INPUT LABEL="Delivery Method" NAME="delivmethod" PARAM="delivmethod" TYPE="SELECT" SIZE="5~200px" LISTSOURCE="TrainingEvent.filterSelDelivMethod"/>
+						<INPUT LABEL="Delivery Method" NAME="delivmethod" PARAM="delivmethod" TYPE="SELECT" REQUIRED="Yes" SIZE="5~200px" LISTSOURCE="TrainingEvent.filterSelDelivMethod"/>
 						<!-- <INPUT LABEL="Evaluation Method" NAME="evalmethod" PARAM="evalmethod" TYPE="SUGGEST" LISTMANDATORY="YES" REQUIRED="YES" ERRMSG="Please Select Evaluation Method" GROUP="" LISTSOURCE="TrainingEvent.filterEvalMethod" /> -->
 						<INPUT LABEL="Evaluation Method" NAME="evalmethod" PARAM="evalmethod" TYPE="SELECT" LISTSOURCE="TrainingEvent" ONCHANGE="changeEval();"/>
 						<INPUT LABEL="Acceptance Criteria (Score)" NAME="acceptcriteria" TYPE="NUMERIC" SIZE="5" MAXLEN="3" PARAM="acceptcriteria" REQUIRED="YES" ERRMSG="Please Input Acceptance Criteria on the tab of General Info"/>
