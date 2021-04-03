@@ -1,0 +1,17 @@
+CREATE TABLE if not exists `tpmdgoalcascading` (
+  `cascadefrom_formno` varchar(50) NOT NULL,
+  `cascadefrom_empid` varchar(50) NOT NULL,
+  `cascadeto_formno` varchar(50) DEFAULT NULL,
+  `cascadeto_empid` varchar(50) NOT NULL,
+  `lib_code` varchar(50) NOT NULL,
+  `lib_type` varchar(50) DEFAULT NULL,
+  `target` float DEFAULT NULL,
+  `company_code` varchar(50) DEFAULT NULL,
+  `polarization` varchar(10) NOT NULL,
+  `consolidation` varchar(10) NOT NULL,
+  `created_by` varchar(50) NOT NULL,
+  `created_date` datetime NOT NULL,
+  `modified_by` varchar(50) DEFAULT NULL,
+  `modified_date` datetime DEFAULT NULL,
+  PRIMARY KEY (`cascadefrom_formno`,`cascadefrom_empid`,`cascadeto_empid`,`lib_code`)
+) 
