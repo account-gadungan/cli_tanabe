@@ -35,3 +35,7 @@ add if not exists attachment_file varchar(500);
 
 alter table TPMDPERFORMANCE_MIDV
 add  if not exists is_verified varchar(1);
+
+
+alter table tpmdperformance_evalh
+add if not exists use_point integer;
