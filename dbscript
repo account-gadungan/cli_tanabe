@@ -46,3 +46,34 @@ CREATE TABLE if not exists `tpmdevald_comppoint` (
   `comp_code` varchar(50) NOT NULL,
   `comp_type` varchar(1) DEFAULT NULL
 ) ;
+
+alter table tpmdperformance_evald
+modify column target varchar(2500);
+
+alter table tpmdperformance_evald
+modify column lib_name_en varchar(2500);
+
+alter table tpmdperformance_evald
+modify column lib_name_id varchar(2500);
+
+alter table tpmdperformance_evald
+modify column lib_name_my varchar(2500);
+
+alter table tpmdperformance_evald
+modify column lib_name_th varchar(2500);
+
+alter table tpmdperformance_evald
+modify column lib_desc_en varchar(2500);
+
+alter table tpmdperformance_evald
+modify column lib_desc_id varchar(2500);
+alter table tpmdperformance_evald
+modify column lib_desc_my varchar(2500);
+alter table tpmdperformance_evald
+modify column lib_desc_th varchar(2500);
+
+alter table tpmdperformance_evald
+modify column notes varchar(2500);
+
+alter table tpmdperformance_evald
+modify column achievement varchar(2500);
