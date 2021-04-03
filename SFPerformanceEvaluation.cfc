@@ -3074,14 +3074,45 @@
 		        <cfset strckEvalD["lib_depth"] = qGetLibDetail.lib_depth>
 		        <cfset strckEvalD["parent_code"] = qGetLibDetail.parent_code>
 		        <cfset strckEvalD["parent_path"] = qGetLibDetail.parent_path>
-				<cfif strckEvalD["lib_code"] eq "PEF-2103-00591">
-					<cf_sfwritelog dump="strckEvalD" prefix="strckEvalD">
-				<cfelse>
-					<cf_sfwritelog dump="strckEvalD" prefix="strckEvalD_#strckEvalD['lib_code']#">
-				</cfif>
+				
 				
 				  <cfset local.retvar = variables.objPerfEvalD.Insert(strckEvalD)>   
-			
+				<cfif retvar>
+					<cf_sfwritelog dump="strckEvalD" prefix="strckEvalD_kedua_">
+				<cfelse>
+					<cf_sfwritelog dump="strckEvalD" prefix="strckEvalD_lagi_#strckEvalD['lib_code']#">
+					<cfquery name="local.qInsertEvalD" datasource="#request.sdsn#">
+					INSERT INTO TPMDPERFORMANCE_EVALD (form_no,reviewer_empid,reviewer_posid,lib_code,lib_type,company_code,weight,achievement,score,weightedscore,target,notes,created_by,created_date,modified_by,modified_date,lib_name_en,lib_desc_en,iscategory,lib_depth,parent_code,parent_path,achievement_type,lookup_code) 
+					VALUES (
+						<cfqueryparam value="#strckEvalD.form_no#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.reviewer_empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.reviewer_posid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.lib_code#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.lib_type#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.company_code#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.weight#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.achievement#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.score#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.weightedscore#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.target#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.notes#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+						#now()#,
+						<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+						#now()#,
+						<cfqueryparam value="#strckEvalD.lib_name_en#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.lib_desc_en#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.iscategory#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.lib_depth#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.parent_code#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.parent_path#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.achievement_type#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.lookup_code#" cfsqltype="cf_sql_varchar">
+						
+						
+					)				
+				</cfquery>
+				</cfif>
 				<!----<cfquery name="local.qInsertEvalD" datasource="#request.sdsn#">
 					INSERT INTO TPMDPERFORMANCE_EVALD (form_no,reviewer_empid,reviewer_posid,lib_code,lib_type,company_code,weight,achievement,score,weightedscore,target,notes,created_by,created_date,modified_by,modified_date,lib_name_en,lib_desc_en,iscategory,lib_depth,parent_code,parent_path,achievement_type,lookup_code) 
 					VALUES (
