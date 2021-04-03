@@ -39,3 +39,10 @@ add  if not exists is_verified varchar(1);
 
 alter table tpmdperformance_evalh
 add if not exists use_point integer;
+
+CREATE TABLE if not exists `tpmdevald_comppoint` (
+  `form_no` varchar(50) NOT NULL,
+  `request_no` varchar(50) DEFAULT NULL,
+  `comp_code` varchar(50) NOT NULL,
+  `comp_type` varchar(1) DEFAULT NULL
+) ;
