@@ -1,0 +1,2129 @@
+<cfcomponent displayname="SFPerformanceEvaluation" hint="SunFish Performance Evaluation Object" extends="sfcomp.bproc.pm.SFPerformanceEvaluation">
+	<cffunction name="getEmpFormData">
+		<cfargument name="empid" default="">
+		<cfargument name="periodcode" default="">
+		<cfargument name="refdate" default="">
+		<cfargument name="compcode" default="">
+		<cfargument name="reqno" default="">
+		<cfargument name="formno" default="">
+		<cfargument name="reviewerempid" default="">
+		<cfargument name="lastreviewer" default="">
+		<!---start : ENC51115-79853--->
+		<cfargument name="varcoid" required="No" default="#request.scookie.coid#">
+		<cfargument name="varcocode" required="No" default="#request.scookie.cocode#">
+			<!---end : ENC51115-79853--->
+		<!--- bakalan ada kasus kalo pindah posisi (SOLUSI : harusnya dipassing atau ?)--->
+		<cfquery name="Local.qGetEmpAttr" datasource="#request.sdsn#">
+			SELECT DISTINCT EC.position_id AS posid, POS.dept_id AS deptid, POS.jobtitle_code AS jtcode
+			FROM TEODEMPCOMPANY EC
+			LEFT JOIN TEOMPOSITION POS
+				ON POS.position_id = EC.position_id
+				AND POS.company_id = EC.company_id
+			WHERE EC.emp_id = <cfqueryparam value="#arguments.empid#" cfsqltype="cf_sql_varchar">
+				AND EC.company_id = <cfqueryparam value="#request.scookie.coid#" cfsqltype="cf_sql_integer">
+		</cfquery>
+		<cfif ucase(compcode) eq "ORGKPI">
+			<cfset local.empposid = qGetEmpAttr.deptid>
+		<cfelse>
+			<cfset local.empposid = qGetEmpAttr.posid>
+		</cfif>
+
+		<!--- Task: BUG50615-45605 --->
+		<cfif len(empposid) eq 0>
+			<cfset empposid = -1>
+		</cfif>
+
+		<cfset local.showFromLastReviewer = 0>
+		<!--- cek kalo udah pernah kesimpan belum (untuk kasus, tabnya ga dibuka terlebih dahulu --->
+		<cfset local.lstLibCode = "">
+		<cfif listfindnocase("COMPETENCY,PERSKPI,ORGKPI,APPRAISAL",ucase(compcode))>
+			<cfquery name="Local.qCekData" datasource="#request.sdsn#">
+				SELECT DISTINCT D.lib_code
+				FROM TPMDPERFORMANCE_EVALH H
+				INNER JOIN TPMDPERFORMANCE_EVALD D
+					ON D.form_no = H.form_no
+					AND D.reviewer_empid = H.reviewer_empid
+					AND D.lib_type = <cfqueryparam value="#ucase(arguments.compcode)#" cfsqltype="cf_sql_varchar">
+				WHERE H.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+					AND H.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+
+					<cfif REQUEST.DBDRIVER EQ 'ORACLE'>
+						AND H.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+					<cfelse>
+						AND H.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+					</cfif>
+
+					AND H.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+					AND H.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+					AND H.reviewer_empid = <cfqueryparam value="#reviewerempid#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+			<cfif not qCekData.recordcount>
+				<cfquery name="Local.qCekData" datasource="#request.sdsn#">
+					SELECT DISTINCT D.lib_code
+					FROM TPMDPERFORMANCE_EVALH H
+					INNER JOIN TPMDPERFORMANCE_EVALD D
+						ON D.form_no = H.form_no
+						AND D.reviewer_empid = H.reviewer_empid
+						AND D.lib_type = <cfqueryparam value="#ucase(arguments.compcode)#" cfsqltype="cf_sql_varchar">
+					WHERE H.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+						AND H.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+						AND H.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+						AND H.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND H.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+						AND H.reviewer_empid = <cfqueryparam value="#lastreviewer#" cfsqltype="cf_sql_varchar">
+				</cfquery>
+				<cfset showFromLastReviewer = 1>
+			</cfif>
+			<cfif listlen(arguments.reviewerempid)>
+			</cfif>
+			<cfset lstLibCode = valuelist(qCekData.lib_code)>
+			<cfset local.records = qCekData.recordcount>
+		</cfif>
+
+		<cfif ucase(compcode) eq "COMPETENCY">
+			<cfif request.dbdriver eq "MSSQL">
+			<cfquery name="Local.qGetCompDefault" datasource="#request.sdsn#">
+				WITH CompLibHier (competence_code,parent_code)
+				AS (
+					SELECT A.competence_code, A.parent_code
+					FROM TPMMCOMPETENCE A
+					INNER JOIN TPMRJOBTITLECOMPETENCE B
+						ON B.competence_code = A.competence_code
+						<cfif len(arguments.reqno) and records>
+						AND B.competence_code IN (<cfqueryparam value="#lstLibCode#" list="yes" cfsqltype="cf_sql_varchar">)
+						<cfelse>
+						AND B.jobtitle_code = <cfqueryparam value="#qGetEmpAttr.jtcode#" cfsqltype="cf_sql_varchar">
+						</cfif>
+					UNION ALL
+
+					SELECT A.competence_code, A.parent_code
+					FROM TPMMCOMPETENCE A
+					INNER JOIN CompLibHier B ON A.competence_code = B.parent_code
+				)
+				SELECT DISTINCT Z.competence_code AS libcode, Z.parent_code AS pcode, C.competence_name_#request.scookie.lang# AS libname,
+					C.competence_depth AS depth, C.iscategory,
+
+					<cfif len(arguments.reqno) and records>
+						ED.target,
+						ED.achievement,
+						ED.score,
+						ED.weight,
+						ED.weightedscore,
+						ED.reviewer_empid,
+					<cfelse>
+						C.maxpoint, D.point_value AS target,
+						'' achievement,
+						'' score,
+						CASE WHEN PC.weight IS NOT NULL THEN PC.weight WHEN C.weight IS NOT NULL THEN C.weight ELSE '0' END weight,
+						'0' weightedscore,
+						'#request.scookie.user.empid#' reviewer_empid,
+					</cfif>
+
+					'' achscoretype,
+					'' lookupscoretype,
+					'N' weightedit,
+					'N' targetedit
+
+				FROM CompLibHier Z
+				<cfif len(arguments.reqno) and records>
+				LEFT JOIN TPMDPERFORMANCE_EVALH EH
+					ON EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+					AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+					AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+				LEFT JOIN TPMDPERFORMANCE_EVALD ED
+					ON ED.form_no = EH.form_no
+					AND ED.company_code = EH.company_code
+					AND ED.lib_code = Z.competence_code
+					AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+					<cfif len(arguments.reviewerempid)>
+						<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+							AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+						<cfelse>
+							AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+						</cfif>
+					</cfif>
+
+				</cfif>
+
+				LEFT JOIN TPMMCOMPETENCE C
+					ON C.competence_code = Z.competence_code
+				LEFT JOIN TPMRJOBTITLECOMPETENCE D
+					ON D.competence_code = Z.competence_code
+					AND D.competence_code = C.competence_code
+					AND D.jobtitle_code = <cfqueryparam value="#qGetEmpAttr.jtcode#" cfsqltype="cf_sql_varchar">
+				LEFT JOIN TPMDPERIODCOMPETENCE PC
+					ON PC.competence_code = C.competence_code
+					AND PC.jobtitle_code = <cfqueryparam value="#qGetEmpAttr.jtcode#" cfsqltype="cf_sql_varchar">
+					AND PC.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+				ORDER BY C.competence_depth, libname
+			</cfquery>
+			<cfelse> <!---riz--->
+			<cfquery name="Local.qGetCompDefault" datasource="#request.sdsn#">
+
+				SELECT DISTINCT Z.competence_code AS libcode, Z.parent_code AS pcode, C.competence_name_#request.scookie.lang# AS libname,
+					C.competence_depth AS depth, C.iscategory,
+
+					<cfif len(arguments.reqno) and records>
+						ED.target,
+						ED.achievement,
+						ED.score,
+						ED.weight,
+						ED.weightedscore,
+						ED.reviewer_empid,
+					<cfelse>
+						C.maxpoint, D.point_value AS target,
+						'' achievement,
+						'' score,
+						<cfif request.dbdriver EQ 'ORACLE'>
+							CASE WHEN TO_CHAR(TO_NUMBER(PC.weight)) IS NOT NULL THEN TO_CHAR(TO_NUMBER(PC.weight)) WHEN TO_CHAR(TO_NUMBER(C.weight)) IS NOT NULL THEN TO_CHAR(TO_NUMBER(C.weight)) ELSE '0' END weight,
+						<cfelse>
+							CASE WHEN PC.weight IS NOT NULL THEN PC.weight WHEN C.weight IS NOT NULL THEN C.weight ELSE '0' END weight,
+						</cfif>
+						'0' weightedscore,
+						'#request.scookie.user.empid#' reviewer_empid,
+					</cfif>
+
+					'' achscoretype,
+					'' lookupscoretype,
+					'N' weightedit,
+					'N' targetedit
+
+				FROM (
+					SELECT A.competence_code, A.parent_code
+					FROM TPMMCOMPETENCE A
+					INNER JOIN TPMRJOBTITLECOMPETENCE B
+						ON B.competence_code = A.competence_code
+						<cfif len(arguments.reqno) and records>
+						AND B.competence_code IN (<cfqueryparam value="#lstLibCode#" list="yes" cfsqltype="cf_sql_varchar">)
+						<cfelse>
+						AND B.jobtitle_code = <cfqueryparam value="#qGetEmpAttr.jtcode#" cfsqltype="cf_sql_varchar">
+						</cfif>
+
+					UNION ALL
+
+					SELECT A.competence_code, A.parent_code
+					FROM TPMMCOMPETENCE A
+					INNER JOIN (
+						SELECT A.competence_code, A.parent_code
+						FROM TPMMCOMPETENCE A
+						INNER JOIN TPMRJOBTITLECOMPETENCE B
+						ON B.competence_code = A.competence_code
+						<cfif len(arguments.reqno) and records>
+						AND B.competence_code IN (<cfqueryparam value="#lstLibCode#" list="yes" cfsqltype="cf_sql_varchar">)
+						<cfelse>
+						AND B.jobtitle_code = <cfqueryparam value="#qGetEmpAttr.jtcode#" cfsqltype="cf_sql_varchar">
+						</cfif>
+					) B ON A.competence_code = B.parent_code
+				) Z
+				<cfif len(arguments.reqno) and records>
+				LEFT JOIN TPMDPERFORMANCE_EVALH EH
+					ON EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+					AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+					AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+				LEFT JOIN TPMDPERFORMANCE_EVALD ED
+					ON ED.form_no = EH.form_no
+					AND ED.company_code = EH.company_code
+					AND ED.lib_code = Z.competence_code
+					AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+					<cfif len(arguments.reviewerempid)>
+						<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+							AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+						<cfelse>
+							AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+						</cfif>
+					</cfif>
+
+				</cfif>
+
+				LEFT JOIN TPMMCOMPETENCE C
+					ON C.competence_code = Z.competence_code
+				LEFT JOIN TPMRJOBTITLECOMPETENCE D
+					ON D.competence_code = Z.competence_code
+					AND D.competence_code = C.competence_code
+					AND D.jobtitle_code = <cfqueryparam value="#qGetEmpAttr.jtcode#" cfsqltype="cf_sql_varchar">
+				LEFT JOIN TPMDPERIODCOMPETENCE PC
+					ON PC.competence_code = C.competence_code
+					AND PC.jobtitle_code = <cfqueryparam value="#qGetEmpAttr.jtcode#" cfsqltype="cf_sql_varchar">
+					AND PC.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+				ORDER BY C.competence_depth,libname
+			</cfquery>
+			</cfif>
+			<!---<cfoutput><div style="display:none"><cfdump var="#qGetCompDefault#"></div></cfoutput>
+			<cf_sfwritelog dump="qGetCompDefault" prefix="YAN_">--->
+			<cfreturn qGetCompDefault>
+
+		<cfelseif listfindnocase("ORGKPI",ucase(compcode))>
+			<cfquery name="local.qCekFromPlanOrEval" datasource="#request.sdsn#">
+				SELECT lib_code FROM TPMDPERFORMANCE_EVALKPI
+				WHERE period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+					AND company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+					AND orgunit_id = <cfqueryparam value="#qGetEmpAttr.deptid#" cfsqltype="cf_sql_integer">
+			</cfquery>
+
+
+			<cfif len(arguments.reqno) and records>
+
+				<cfquery name="Local.qGetOrgUnit" datasource="#request.sdsn#">
+					SELECT DISTINCT ED.lib_name_#request.scookie.lang# AS libname,
+						EVKPI.lib_desc_#request.scookie.lang# lib_desc_en,
+						ED.lib_code AS libcode, ED.parent_code AS pcode, ED.lib_depth AS depth, ED.iscategory,
+						ED.target,
+						ED.achievement,
+						ED.score,
+						ED.weight,
+						ED.weightedscore,
+						ED.reviewer_empid,
+						ED.achievement_type AS achscoretype,
+						ED.lookup_code AS lookupscoretype,
+						EVKPI.lib_order,
+						<cfif not qCekFromPlanOrEval.recordcount>
+							'0' evalkpi_status
+						<cfelse>
+							EVKPI.evalkpi_status
+						</cfif>
+					<cfif not qCekFromPlanOrEval.recordcount>
+					FROM TPMDPERFORMANCE_PLANKPI EVKPI
+					<cfelse>
+					FROM TPMDPERFORMANCE_EVALKPI EVKPI
+					</cfif>
+					LEFT JOIN TPMDPERFORMANCE_EVALD ED
+						ON ED.lib_code = EVKPI.lib_code
+						AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+						<cfif len(arguments.reqno) and records>
+						AND ED.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+						</cfif>
+
+						<cfif len(arguments.reviewerempid)>
+							<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+							<cfelse>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+							</cfif>
+						</cfif>
+					WHERE EVKPI.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND EVKPI.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+						AND EVKPI.orgunit_id = <cfqueryparam value="#qGetEmpAttr.deptid#" cfsqltype="cf_sql_integer">
+					ORDER BY EVKPI.lib_order, ED.lib_depth, ED.lib_name_#request.scookie.lang#
+				</cfquery>
+
+			<cfelse>
+
+				<cfquery name="Local.qGetOrgUnit" datasource="#request.sdsn#">
+					SELECT distinct EVKPI.lib_code AS libcode, EVKPI.parent_code AS pcode, EVKPI.lib_name_#request.scookie.lang# AS libname,
+					EVKPI.lib_desc_#request.scookie.lang# lib_desc_en,
+						EVKPI.lib_depth AS depth, EVKPI.iscategory,
+						<cfif len(arguments.reqno) and records>
+							ED.target,
+							ED.achievement,
+							ED.score,
+							Round(ED.weight,#REQUEST.InitVarCountDeC#) weight,
+							Round(ED.weightedscore,#REQUEST.InitVarCountDeC#) weightedscore,
+							ED.reviewer_empid,
+						<cfelseif not qCekFromPlanOrEval.recordcount>
+							EVKPI.target,
+							'' achievement,
+							'0' score,
+							Round(EVKPI.weight,#REQUEST.InitVarCountDeC#) weight,
+							'0' weightedscore,
+							'#request.scookie.user.empid#' reviewer_empid,
+						<cfelse>
+							EVKPI.target,
+							EVKPI.achievement,
+							EVKPI.score,
+							Round(EVKPI.weight,#REQUEST.InitVarCountDeC#) weight,
+							'0' weightedscore,
+							'#request.scookie.user.empid#' reviewer_empid,
+						</cfif>
+
+						<!---EVKPI.achievement_type AS achscoretype, --->
+						<cfif not qCekFromPlanOrEval.recordcount>
+						CASE WHEN EVKPI.isnew = 'Y' THEN EVKPI.achievement_type
+							WHEN EVKPI.isnew = 'N' THEN LIB.achievement_type
+							END achscoretype,
+						<cfelse>
+						CASE
+								WHEN EVKPI.achievement_type IS NOT NULL AND <cfif request.dbdriver eq "MSSQL">LEN(EVKPI.achievement_type)<cfelse>LENGTH(EVKPI.achievement_type)</cfif> <> 0 THEN EVKPI.achievement_type
+								WHEN PK.achievement_type IS NOT NULL THEN PK.achievement_type
+								ELSE LIB.achievement_type
+							END achscoretype,
+						</cfif>
+						CASE
+							WHEN EVKPI.lookup_code IS NOT NULL THEN EVKPI.lookup_code <!--- TCK1507-002557 --->
+							WHEN PK.lookup_code IS NOT NULL THEN PK.lookup_code
+							ELSE ''
+						END lookupscoretype,
+
+						'N' weightedit,
+						'N' targetedit,
+
+						EVKPI.lib_order,
+
+					<cfif not qCekFromPlanOrEval.recordcount>
+						'0' evalkpi_status
+					<cfelse>
+						EVKPI.evalkpi_status
+					</cfif>
+
+					<cfif not qCekFromPlanOrEval.recordcount>
+					FROM TPMDPERFORMANCE_PLANKPI EVKPI
+					<cfelse>
+					FROM TPMDPERFORMANCE_EVALKPI EVKPI
+					</cfif>
+
+					<cfif len(arguments.reqno) and records>
+					LEFT JOIN TPMDPERFORMANCE_EVALD ED
+						ON ED.lib_code = EVKPI.lib_code
+						AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+
+						<cfif len(arguments.reqno) and records>
+						AND ED.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+						</cfif>
+
+						<cfif len(arguments.reviewerempid)>
+							<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+							<cfelse>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+							</cfif>
+						</cfif>
+					</cfif>
+
+					LEFT JOIN TPMDPERIODKPI PK
+						ON PK.period_code = EVKPI.period_code
+						AND PK.reference_date = EVKPI.reference_date
+						AND PK.company_code = EVKPI.company_code
+						AND PK.position_id = EVKPI.orgunit_id
+						AND PK.kpilib_code = EVKPI.lib_code
+						AND PK.kpi_type = 'ORGUNIT'
+					LEFT JOIN TPMDPERIODKPILIB LIB
+						ON LIB.period_code = EVKPI.period_code
+						AND LIB.company_code = EVKPI.company_code
+						AND LIB.kpilib_code = EVKPI.lib_code
+						AND LIB.reference_date = EVKPI.reference_date
+
+					WHERE EVKPI.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND EVKPI.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+						AND EVKPI.orgunit_id = <cfqueryparam value="#qGetEmpAttr.deptid#" cfsqltype="cf_sql_integer">
+					ORDER BY EVKPI.lib_order, EVKPI.lib_depth, EVKPI.lib_name_#request.scookie.lang#
+				</cfquery>
+
+				<cfif not qGetOrgUnit.recordcount>
+					<cfquery name="Local.qGetOrgUnit" datasource="#request.sdsn#">
+						SELECT PLKPI.lib_code AS libcode, PLKPI.parent_code AS pcode, PLKPI.lib_name_#request.scookie.lang# AS libname, PLKPI.lib_desc_en,
+							PLKPI.lib_depth AS depth, PLKPI.iscategory,
+							PLKPI.achievement_type AS achscoretype, PLKPI.weight, PLKPI.target, PLKPI.isnew, '' evalkpi_status,
+							'' achievement,
+							PLKPI.lookup_code lookupscoretype, <!--- TCK1507-002557 --->
+							'' score, '0' weightedscore
+						FROM TPMDPERFORMANCE_PLANKPI PLKPI
+						INNER JOIN TCLTREQUEST R
+							ON R.req_no = PLKPI.request_no
+							AND R.req_type = 'PERFORMANCE.PLAN'
+							AND R.company_code = PLKPI.company_code
+							AND R.status IN (3,9)
+						WHERE PLKPI.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+							AND PLKPI.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+							AND PLKPI.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+							AND PLKPI.orgunit_id = <cfqueryparam value="#qGetEmpAttr.deptid#" cfsqltype="cf_sql_integer">
+
+							<!---start : ENC50915-79511--->
+							AND PLKPI.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+							<!---end : ENC50915-79511--->
+						ORDER BY PLKPI.lib_order, PLKPI.lib_depth, PLKPI.lib_name_#request.scookie.lang#
+					</cfquery>
+
+				</cfif>
+
+			</cfif>
+
+			<cfreturn qGetOrgUnit>
+
+		<cfelseif listfindnocase("PERSKPI",ucase(compcode))>
+
+			<!--- cek kalo ada di PLAND --->
+			<cfquery name="Local.qGetFromPlan" datasource="#request.sdsn#">
+				SELECT DISTINCT form_no, reviewer_empid, request_no FROM TPMDPERFORMANCE_PLANH
+				WHERE period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+					AND company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+					AND reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+					AND reviewee_empid = <cfqueryparam value="#arguments.empid#" cfsqltype="cf_sql_varchar">
+					AND isfinal = 1
+			</cfquery>
+
+			<!--- <cfquery name="Local.qCekLib" datasource="#request.sdsn#">
+				SELECT * FROM TPMDPERFORMANCE_PLAND
+				WHERE form_no = <cfqueryparam value="#qGetFromPlan.form_no#" cfsqltype="cf_sql_varchar">
+					AND reviewer_empid = <cfqueryparam value="#qGetFromPlan.reviewer_empid#" cfsqltype="cf_sql_varchar">
+			</cfquery> ---->
+
+			<cfquery name="Local.qGetNewLib" datasource="#request.sdsn#">
+				SELECT DISTINCT lib_code FROM TPMDPERFORMANCE_PLAND
+				WHERE form_no = <cfqueryparam value="#qGetFromPlan.form_no#" cfsqltype="cf_sql_varchar">
+					AND reviewer_empid = <cfqueryparam value="#qGetFromPlan.reviewer_empid#" cfsqltype="cf_sql_varchar">
+					AND isnew = 'Y'
+			</cfquery>
+
+			<cfset Local.lstNewLibCode = valuelist(qGetNewLib.lib_code)>
+
+			<cfif (len(arguments.reqno) and records)> <!---OR (not qCekLib.recordcount) BUG50915-51061--->
+
+				<!--- Marc Notes : Query untuk load Eval setelah ada di save pertama kali (draft/send to approver) --->
+				<cfquery name="Local.qGetKPIDefault" datasource="#request.sdsn#">
+					SELECT * from (
+					SELECT DISTINCT ED.lib_name_#request.scookie.lang# AS libname,AP.kpi_desc_#request.scookie.lang# AS lib_desc_en,
+						ED.lib_code AS libcode, ED.parent_code AS pcode, ED.lib_depth AS depth, ED.iscategory,
+						ED.target,
+						ED.achievement,
+						ED.score,
+						ED.weight,
+						ED.weightedscore,
+						ED.reviewer_empid,
+						ED.achievement_type AS achscoretype,
+							<cfif qGetFromPlan.recordcount>
+							PLD.lib_order,
+							<cfelse>
+							'0' lib_order,
+							</cfif>
+						ED.lookup_code AS lookupscoretype
+						<!---
+						, PA.editable_weight AS weightedit
+						, PA.editable_target AS targetedit
+						--->
+						<!--- Add by Marc --->
+						,pld.criteria,pld.initiative,pld.scheduleplan
+						,ed.actionresult <!--- ambil dari table evald --->
+						,pld.pointscriteria
+					FROM TPMDPERFORMANCE_EVALH EH
+					LEFT JOIN TPMDPERFORMANCE_EVALD ED
+						ON ED.form_no = EH.form_no
+						AND ED.company_code = EH.company_code
+						AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+					LEFT JOIN TPMDPERIODKPILIB AP
+						ON ED.lib_code = AP.kpilib_code AND EH.period_code=AP.period_code
+						AND ED.company_code =  AP.company_code
+					<cfif qGetFromPlan.recordcount>
+					LEFT JOIN TPMDPERFORMANCE_PLAND PLD
+						ON PLD.lib_code = ED.lib_code
+						AND PLD.form_no = <cfqueryparam value="#qGetFromPlan.form_no#" cfsqltype="cf_sql_varchar">
+						AND PLD.reviewer_empid IN (<cfqueryparam value="#qGetFromPlan.REVIEWER_EMPID#" list="yes" cfsqltype="cf_sql_varchar">)
+						AND PLD.request_no = <cfqueryparam value="#qGetFromPlan.request_no#" cfsqltype="cf_sql_varchar">
+					</cfif>
+
+					WHERE
+						<cfif len(arguments.reviewerempid)>
+							<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+									ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+							<cfelse>
+									ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+							</cfif>
+						</cfif>
+
+						AND EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND EH.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+						AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+						AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+					) tblperskpi
+					ORDER BY tblperskpi.lib_order, tblperskpi.depth, tblperskpi.libname
+				</cfquery>
+
+			<cfelse>
+
+				<!--- Marc Notes : Query untuk load Eval dari Planning Form pertama kali (belum ada save data) --->
+				<cfquery name="Local.qGetKPIDefault" datasource="#request.sdsn#">
+					SELECT * from (
+					SELECT DISTINCT PLD.lib_name_en AS libname,
+						PLD.lib_code AS libcode, PLD.parent_code AS pcode, PLD.lib_depth AS depth, PLD.iscategory,
+						PLD.target,
+						'' achievement,
+						'' score,
+						PLD.weight,
+						'' weightedscore,
+						'' reviewer_empid,
+						PLD.achievement_type AS achscoretype,
+							PLD.lib_order,
+						PLD.lookup_code AS lookupscoretype,
+						AP.kpi_desc_#request.scookie.lang# AS lib_desc_en
+
+						<!--- Add by Marc --->
+						,pld.criteria,pld.initiative,pld.scheduleplan,pld.actionresult,pld.pointscriteria
+
+					FROM TPMDPERFORMANCE_PLANH PLANH
+						LEFT JOIN TPMDPERFORMANCE_PLAND PLD
+
+						ON (PLD.lib_code = PLD.lib_code
+							<cfif qGetFromPlan.recordcount>
+							AND PLD.form_no = <cfqueryparam value="#qGetFromPlan.form_no#" cfsqltype="cf_sql_varchar">
+							AND PLD.request_no = <cfqueryparam value="#qGetFromPlan.request_no#" cfsqltype="cf_sql_varchar">
+							AND PLD.reviewer_empid IN (<cfqueryparam value="#qGetFromPlan.REVIEWER_EMPID#" list="yes" cfsqltype="cf_sql_varchar">)
+							<cfelse>
+						AND 1 = 0
+							</cfif>
+						)
+						LEFT JOIN TPMDPERIODKPILIB AP
+						ON PLD.lib_code = AP.kpilib_code AND PLANH.period_code=AP.period_code
+						AND PLD.company_code =  AP.company_code
+						WHERE PLANH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND PLANH.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+						<cfif qGetFromPlan.recordcount>
+							AND PLANH.form_no = <cfqueryparam value="#qGetFromPlan.form_no#" cfsqltype="cf_sql_varchar">
+							AND PLANH.request_no = <cfqueryparam value="#qGetFromPlan.request_no#" cfsqltype="cf_sql_varchar">
+							AND PLANH.REVIEWER_EMPID = <cfqueryparam value="#qGetFromPlan.REVIEWER_EMPID#" cfsqltype="cf_sql_varchar">
+						<cfelse>
+							AND 1 = 0
+						</cfif>
+
+
+					) tblperskpi
+					ORDER BY tblperskpi.lib_order, tblperskpi.depth, tblperskpi.libname
+
+
+				</cfquery>
+
+				<!---<cf_sfwritelog dump="arguments.lastreviewer,arguments.reviewerempid,qGetFromPlan.REVIEWER_EMPID" prefix="qGetKPIDefault_"> ---->
+
+				<!-----
+
+				<cfif request.dbdriver eq "MSSQL">
+
+				<cfquery name="Local.qGetKPIDefault" datasource="#request.sdsn#">
+					WITH KPILibHier (kpilib_code,parent_code,kpi_name, depth, iscategory)
+					AS (
+						SELECT K.kpilib_code, K.parent_code, K.kpi_name_#request.scookie.lang#, K.kpi_depth, K.iscategory
+						FROM TPMDPERIODKPILIB K
+						INNER JOIN TPMDPERIODKPI PK
+							ON PK.period_code = K.period_code
+							AND PK.company_code =K.company_code
+							AND PK.reference_date = K.reference_date
+							AND PK.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+							AND PK.kpilib_code = K.kpilib_code
+						WHERE PK.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+							AND PK.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+							AND PK.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+							<cfif ucase(compcode) eq "PERSKPI">
+								AND PK.kpi_type = 'PERSONAL'
+							<cfelse>
+								AND PK.kpi_type = 'ORGUNIT'
+							</cfif>
+
+						UNION ALL
+
+						SELECT A.kpilib_code, A.parent_code, A.kpi_name_#request.scookie.lang#, A.kpi_depth, A.iscategory
+						FROM TPMDPERIODKPILIB A
+						INNER JOIN KPILibHier AS B ON A.kpilib_code = B.parent_code
+						<!--- pake yg category juga --->
+						<!---
+						WHERE A.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+							AND A.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+							AND A.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+
+					--->
+					)
+
+					<cfif qGetNewLib.recordcount>
+					SELECT * FROM (
+					</cfif>
+
+					SELECT DISTINCT Z.kpi_name AS libname,z.lib_desc_en, Z.kpilib_code AS libcode, Z.parent_code AS pcode, Z.depth, Z.iscategory,
+						<cfif len(arguments.reqno) and records>
+							ED.target,
+							ED.achievement,
+							ED.score,
+							ED.weight,
+							ED.weightedscore,
+							ED.reviewer_empid,
+							<cfif qGetFromPlan.recordcount>
+							PLD.lib_order,
+							<cfelse>
+							'0' lib_order,
+							</cfif>
+						<cfelseif qGetFromPlan.recordcount>
+							PLD.target,
+							'' achievement,
+							'' score,
+							PLD.weight,
+							'0' weightedscore,
+							'#request.scookie.user.empid#' reviewer_empid,
+							PLD.lib_order,
+						<cfelse>
+							PK.target,
+							'' achievement,
+							'' score,
+							CASE
+								<!---
+								WHEN PK.weight IS NOT NULL AND PK.weight <> 0 THEN PK.weight
+								WHEN PK.weight = 0 AND KPI.weight IS NOT NULL AND KPI.weight <> 0 THEN KPI.weight
+								ELSE PK.weight
+								--->
+								WHEN PK.weight IS NOT NULL THEN PK.weight
+								WHEN KPI.weight IS NOT NULL THEN KPI.weight
+								ELSE '0'
+							END weight,
+							'0' weightedscore,
+							'#request.scookie.user.empid#' reviewer_empid,
+							'0' lib_order,
+						</cfif>
+						CASE
+							WHEN PK.achievement_type IS NOT NULL THEN PK.achievement_type
+							ELSE KPI.achievement_type
+						END achscoretype,
+
+						PK.lookup_code AS lookupscoretype,
+						PK.editable_weight AS weightedit,
+						PK.editable_target AS targetedit
+
+					FROM KPILibHier Z
+
+					<cfif len(arguments.reqno) and records>
+					LEFT JOIN TPMDPERFORMANCE_EVALH EH
+						ON EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+						AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+					LEFT JOIN TPMDPERFORMANCE_EVALD ED
+						ON ED.form_no = EH.form_no
+						AND ED.company_code = EH.company_code
+						AND ED.lib_code = Z.kpilib_code
+						AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+						<cfif len(arguments.reviewerempid)>
+							<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+							<cfelse>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+							</cfif>
+						</cfif>
+					</cfif>
+
+					<!--- dipisah, biar yang isnew juga keambil --->
+					<cfif qGetFromPlan.recordcount>
+					LEFT JOIN TPMDPERFORMANCE_PLAND PLD
+						ON PLD.lib_code = Z.kpilib_code
+						AND PLD.form_no = <cfqueryparam value="#qGetFromPlan.form_no#" cfsqltype="cf_sql_varchar">
+						AND PLD.reviewer_empid = <cfqueryparam value="#qGetFromPlan.reviewer_empid#" cfsqltype="cf_sql_varchar">
+						AND PLD.request_no in (select request_no from TPMDPERFORMANCE_PLANH where isfinal=1 and form_no = PLD.form_no) <!---added by ENC50915-79511--->
+					</cfif>
+
+					LEFT JOIN TPMDPERIODKPILIB KPI
+						ON KPI.kpilib_code = Z.kpilib_code
+						AND KPI.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND KPI.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+						AND KPI.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+					LEFT JOIN TPMDPERIODKPI PK
+						ON PK.period_code = KPI.period_code
+						AND PK.company_code =KPI.company_code
+						AND PK.reference_date = KPI.reference_date
+						AND PK.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+						AND PK.kpilib_code = KPI.kpilib_code
+						<cfif ucase(compcode) eq "PERSKPI">
+							AND PK.kpi_type = 'PERSONAL'
+						<cfelse>
+							AND PK.kpi_type = 'ORGUNIT'
+						</cfif>
+
+					<cfif not qGetNewLib.recordcount>
+						ORDER BY Z.depth, Z.kpi_name
+					</cfif>
+
+					<cfif qGetNewLib.recordcount>
+					UNION
+
+					SELECT PLD.lib_name_en AS libname,AP.kpi_desc_#request.scookie.lang# AS lib_desc_en, PLD.lib_code AS libcode, PLD.parent_code AS pcode, PLD.lib_depth AS depth, PLD.iscategory,
+						<cfif len(arguments.reqno) and records>
+							ED.target,
+							ED.achievement,
+							ED.score,
+							ED.weight,
+							ED.weightedscore,
+							ED.reviewer_empid,
+							PLD.lib_order,
+						<cfelse>
+							PLD.target,
+							'' achievement,
+							'' score,
+							PLD.weight,
+							'0' weightedscore,
+							'#request.scookie.user.empid#' reviewer_empid,
+							PLD.lib_order,
+						</cfif>
+							PLD.achievement_type achscoretype,
+							PLD.lookup_code AS lookupscoretype, <!--- TCK1507-002557 --->
+							<!---
+							'' lookupscoretype,
+							--->
+
+							'N' weightedit,
+							'N' targetedit
+
+					FROM TPMDPERFORMANCE_PLAND PLD
+
+					<!---lstNewLibCode--->
+					<cfif len(arguments.reqno) and records>
+					LEFT JOIN TPMDPERFORMANCE_EVALH EH
+						ON EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+						AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+					LEFT JOIN TPMDPERFORMANCE_EVALD ED
+						ON ED.form_no = EH.form_no
+						AND ED.company_code = EH.company_code
+						AND ED.lib_code = PLD.lib_code
+
+					LEFT JOIN TPMDPERIODKPILIB AP
+						ON ED.lib_code = AP.kpilib_code AND EH.period_code=AP.period_code
+						AND ED.company_code =  AP.company_code
+					</cfif>
+
+					WHERE
+						upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+						<cfif len(arguments.reviewerempid)>
+							<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+							<cfelse>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+							</cfif>
+						</cfif> AND
+						PLD.form_no = <cfqueryparam value="#qGetFromPlan.form_no#" cfsqltype="cf_sql_varchar">
+						AND PLD.reviewer_empid = <cfqueryparam value="#qGetFromPlan.reviewer_empid#" cfsqltype="cf_sql_varchar">
+						AND PLD.isnew = 'Y'
+						AND PLD.request_no in (select request_no from TPMDPERFORMANCE_PLANH where isfinal=1 and form_no = PLD.form_no) <!---added by ENC50915-79511--->
+					</cfif>
+
+					<cfif qGetNewLib.recordcount>
+					) tblperskpi
+					ORDER BY tblperskpi.lib_order, tblperskpi.depth, tblperskpi.libname
+					</cfif>
+				</cfquery>
+
+				<cfelse> <!---riz--->
+					<cfquery name="Local.qGetKPIDefault" datasource="#request.sdsn#">
+
+					<cfif qGetNewLib.recordcount>
+					SELECT * FROM (
+					</cfif>
+
+					SELECT DISTINCT Z.kpi_name AS libname,Z.lib_desc_en, Z.kpilib_code AS libcode, Z.parent_code AS pcode, Z.depth, Z.iscategory,
+						<cfif len(arguments.reqno) and records>
+							ED.target,
+							ED.achievement,
+							ED.score,
+							ED.weight,
+							ED.weightedscore,
+							ED.reviewer_empid,
+							<cfif qGetFromPlan.recordcount>
+							PLD.lib_order,
+							<cfelse>
+							'0' lib_order,
+							</cfif>
+						<cfelseif qGetFromPlan.recordcount>
+							PLD.target,
+							'' achievement,
+							'' score,
+							PLD.weight,
+							'0' weightedscore,
+							'#request.scookie.user.empid#' reviewer_empid,
+							PLD.lib_order,
+						<cfelse>
+							PK.target,
+							'' achievement,
+							'' score,
+							CASE
+								<!---
+								WHEN PK.weight IS NOT NULL AND PK.weight <> 0 THEN PK.weight
+								WHEN PK.weight = 0 AND KPI.weight IS NOT NULL AND KPI.weight <> 0 THEN KPI.weight
+								ELSE PK.weight
+								--->
+								WHEN PK.weight IS NOT NULL THEN PK.weight
+								WHEN KPI.weight IS NOT NULL THEN KPI.weight
+								ELSE '0'
+							END weight,
+							'0' weightedscore,
+							'#request.scookie.user.empid#' reviewer_empid,
+							'0' lib_order,
+						</cfif>
+						CASE
+							WHEN PK.achievement_type IS NOT NULL THEN PK.achievement_type
+							ELSE KPI.achievement_type
+						END achscoretype,
+
+						PK.lookup_code AS lookupscoretype,
+						PK.editable_weight AS weightedit,
+						PK.editable_target AS targetedit
+
+					FROM
+					(
+						SELECT K.kpilib_code, K.parent_code,K.kpi_desc_#request.scookie.lang# AS lib_desc_en, K.kpi_name_#request.scookie.lang# kpi_name, K.kpi_depth depth, K.iscategory
+						FROM TPMDPERIODKPILIB K
+						INNER JOIN TPMDPERIODKPI PK
+							ON PK.period_code = K.period_code
+							AND PK.company_code =K.company_code
+							AND PK.reference_date = K.reference_date
+							AND PK.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+							AND PK.kpilib_code = K.kpilib_code
+						WHERE PK.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+							AND PK.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+							AND PK.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+							<cfif ucase(compcode) eq "PERSKPI">
+								AND PK.kpi_type = 'PERSONAL'
+							<cfelse>
+								AND PK.kpi_type = 'ORGUNIT'
+							</cfif>
+
+						UNION ALL
+
+						SELECT A.kpilib_code, A.parent_code,K.kpi_desc_#request.scookie.lang# AS lib_desc_en,A.kpi_name_#request.scookie.lang#, A.kpi_depth, A.iscategory
+						FROM TPMDPERIODKPILIB A
+						INNER JOIN (
+							SELECT K.kpilib_code, K.parent_code, K.kpi_name_#request.scookie.lang#, K.kpi_depth, K.iscategory
+							FROM TPMDPERIODKPILIB K
+							INNER JOIN TPMDPERIODKPI PK
+								ON PK.period_code = K.period_code
+								AND PK.company_code =K.company_code
+								AND PK.reference_date = K.reference_date
+								AND PK.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+								AND PK.kpilib_code = K.kpilib_code
+							WHERE PK.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+								AND PK.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+								AND PK.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+								<cfif ucase(compcode) eq "PERSKPI">
+									AND PK.kpi_type = 'PERSONAL'
+								<cfelse>
+									AND PK.kpi_type = 'ORGUNIT'
+								</cfif>
+						) AS B ON A.kpilib_code = B.parent_code
+
+
+					) Z
+
+					<cfif len(arguments.reqno) and records>
+					LEFT JOIN TPMDPERFORMANCE_EVALH EH
+						ON EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+						AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+					LEFT JOIN TPMDPERFORMANCE_EVALD ED
+						ON ED.form_no = EH.form_no
+						AND ED.company_code = EH.company_code
+						AND ED.lib_code = Z.kpilib_code
+						AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+						<cfif len(arguments.reviewerempid)>
+							<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+							<cfelse>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+							</cfif>
+						</cfif>
+					</cfif>
+
+					<!--- dipisah, biar yang isnew juga keambil --->
+					<cfif qGetFromPlan.recordcount>
+					LEFT JOIN TPMDPERFORMANCE_PLAND PLD
+						ON PLD.lib_code = Z.kpilib_code
+						AND PLD.form_no = <cfqueryparam value="#qGetFromPlan.form_no#" cfsqltype="cf_sql_varchar">
+						AND PLD.reviewer_empid = <cfqueryparam value="#qGetFromPlan.reviewer_empid#" cfsqltype="cf_sql_varchar">
+						AND PLD.request_no in (select request_no from TPMDPERFORMANCE_PLANH where isfinal=1 and form_no = PLD.form_no) <!---added by ENC50915-79511--->
+					</cfif>
+
+					LEFT JOIN TPMDPERIODKPILIB KPI
+						ON KPI.kpilib_code = Z.kpilib_code
+						AND KPI.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND KPI.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+						AND KPI.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+					LEFT JOIN TPMDPERIODKPI PK
+						ON PK.period_code = KPI.period_code
+						AND PK.company_code =KPI.company_code
+						AND PK.reference_date = KPI.reference_date
+						AND PK.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+						AND PK.kpilib_code = KPI.kpilib_code
+						<cfif ucase(compcode) eq "PERSKPI">
+							AND PK.kpi_type = 'PERSONAL'
+						<cfelse>
+							AND PK.kpi_type = 'ORGUNIT'
+						</cfif>
+
+					<cfif not qGetNewLib.recordcount>
+						ORDER BY Z.depth, Z.kpi_name
+					</cfif>
+
+					<cfif qGetNewLib.recordcount>
+					UNION
+
+					SELECT PLD.lib_name_en AS libname, PLD.lib_code AS libcode, PLD.parent_code AS pcode, PLD.lib_depth AS depth, PLD.iscategory,
+						<cfif len(arguments.reqno) and records>
+							ED.target,
+							ED.achievement,
+							ED.score,
+							ED.weight,
+							ED.weightedscore,
+							ED.reviewer_empid,
+							PLD.lib_order,
+						<cfelse>
+							PLD.target,
+							'' achievement,
+							'' score,
+							PLD.weight,
+							'0' weightedscore,
+							'#request.scookie.user.empid#' reviewer_empid,
+							PLD.lib_order,
+						</cfif>
+
+							PLD.achievement_type achscoretype,
+							PLD.lookup_code AS lookupscoretype, <!--- TCK1507-002557 --->
+							<!---
+							'' lookupscoretype,
+							--->
+
+							'N' weightedit,
+							'N' targetedit
+
+					FROM TPMDPERFORMANCE_PLAND PLD
+
+					<!---lstNewLibCode--->
+					<cfif len(arguments.reqno) and records>
+					LEFT JOIN TPMDPERFORMANCE_EVALH EH
+						ON EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+						AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+					LEFT JOIN TPMDPERFORMANCE_EVALD ED
+						ON ED.form_no = EH.form_no
+						AND ED.company_code = EH.company_code
+						AND ED.lib_code = PLD.lib_code
+						LEFT JOIN TPMDPERIODKPIRLIB AP
+						ON ED.lib_code = AP.kpilib_code AND EH.period_code=AP.period_code
+						AND ED.company_code =  AP.company_code
+					WHERE
+						upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+						<cfif len(arguments.reviewerempid)>
+							<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+							<cfelse>
+								AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+							</cfif>
+						</cfif>
+					</cfif>
+						PLD.form_no = <cfqueryparam value="#qGetFromPlan.form_no#" cfsqltype="cf_sql_varchar">
+						AND PLD.reviewer_empid = <cfqueryparam value="#qGetFromPlan.reviewer_empid#" cfsqltype="cf_sql_varchar">
+						AND PLD.isnew = 'Y'
+						AND PLD.request_no in (select request_no from TPMDPERFORMANCE_PLANH where isfinal=1 and form_no = PLD.form_no) <!---added by ENC50915-79511--->
+					</cfif>
+
+					<cfif qGetNewLib.recordcount>
+					) tblperskpi
+					ORDER BY tblperskpi.lib_order, tblperskpi.depth, tblperskpi.libname
+					</cfif>
+				</cfquery>
+				</cfif> <!---riz--->
+
+				---->
+
+			</cfif>
+
+			<cfreturn qGetKPIDefault>
+
+		<cfelseif ucase(compcode) eq "APPRAISAL">
+			<cfif len(arguments.reqno) and records>
+				<cfquery name="local.qGetApprDefault" datasource="#request.sdsn#">
+					SELECT DISTINCT ED.lib_name_#request.scookie.lang# AS libname, AP.appraisal_desc_#request.scookie.lang# as description,
+						ED.lib_code AS libcode, ED.parent_code AS pcode, ED.lib_depth AS depth, ED.iscategory,
+						ED.target,
+						ED.achievement,
+						ED.score,
+						ED.weight,
+						ED.weightedscore,
+						ED.reviewer_empid,
+						ED.achievement_type AS achscoretype,
+						ED.lookup_code AS lookupscoretype
+						,(select negative_component from tpmmappraisal where appraisal_code = ED.lib_code) as negative_component
+						<!---
+						, PA.editable_weight AS weightedit
+						, PA.editable_target AS targetedit
+						--->
+					FROM TPMDPERFORMANCE_EVALH EH
+					LEFT JOIN TPMDPERFORMANCE_EVALD ED
+						ON ED.form_no = EH.form_no
+						AND ED.company_code = EH.company_code
+					LEFT JOIN TPMDPERIODAPPRLIB AP
+					ON ED.lib_code = AP.apprlib_code AND EH.period_code=AP.period_code
+					AND ED.company_code =  AP.company_code
+
+
+					WHERE EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+						AND EH.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+						AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+						AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+						AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+						<cfif varcocode eq request.scookie.cocode>
+							<cfif len(arguments.reviewerempid)>
+								<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+									AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+								<cfelse>
+									AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+								</cfif>
+							</cfif>
+						</cfif>
+					<!--- ORDER BY ED.lib_depth, ED.lib_name_#request.scookie.lang# --->
+					ORDER BY LIBCODE
+				</cfquery>
+
+			<cfelse>
+				<cfif request.dbdriver eq "MSSQL">
+					<cfquery name="Local.qGetApprDefault" datasource="#request.sdsn#">
+						WITH ApprLibHier (apprlib_code,parent_code,order_no,appraisal_name,description,depth, iscategory)
+						AS (
+							SELECT A.apprlib_code, A.parent_code,A.order_no, A.appraisal_name_#request.scookie.lang#,  A.appraisal_desc_#request.scookie.lang#,A.appraisal_depth, A.iscategory
+							FROM TPMDPERIODAPPRLIB A
+							INNER JOIN TPMDPERIODAPPRAISAL PA
+								ON PA.period_code = A.period_code
+								AND PA.company_code =A.company_code
+								AND PA.reference_date = A.reference_date
+								AND PA.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+								AND PA.apprlib_code = A.apprlib_code
+							WHERE PA.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+								AND PA.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+								AND PA.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+
+							UNION ALL
+							SELECT A.apprlib_code, A.parent_code, A.order_no,A.appraisal_name_#request.scookie.lang#,
+							A.appraisal_desc_#request.scookie.lang#,A.appraisal_depth, A.iscategory
+							FROM TPMDPERIODAPPRLIB A
+							INNER JOIN ApprLibHier B ON A.apprlib_code = B.parent_code
+							WHERE A.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+								AND A.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+								AND A.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+						)
+
+						SELECT DISTINCT Z.appraisal_name AS libname, z.description,Z.apprlib_code AS libcode, Z.order_no, Z.parent_code AS pcode, Z.depth, Z.iscategory,
+							<cfif len(arguments.reqno) and records>
+								ED.target,
+								ED.achievement,
+								ED.score,
+								ED.weight,
+								ED.weightedscore,
+								ED.reviewer_empid,
+							<cfelse>
+								PA.target,
+								'' achievement,
+								'' score,
+								CASE
+									<!---
+									WHEN PA.weight IS NOT NULL AND PA.weight <> 0 THEN PA.weight
+									WHEN PA.weight = 0 AND APPR.weight IS NOT NULL AND APPR.weight <> 0 THEN APPR.weight
+									ELSE PA.weight
+									--->
+									WHEN PA.weight IS NOT NULL THEN PA.weight
+									WHEN APPR.weight IS NOT NULL THEN APPR.weight
+									ELSE '0'
+								END weight,
+								'0' weightedscore,
+								'#request.scookie.user.empid#' reviewer_empid,
+							</cfif>
+							CASE
+								WHEN PA.achievement_type IS NOT NULL THEN PA.achievement_type
+								ELSE APPR.achievement_type
+							END achscoretype,
+							PA.lookup_code AS lookupscoretype,
+
+							PA.editable_weight AS weightedit,
+							PA.editable_target AS targetedit
+
+						FROM ApprLibHier Z
+						<cfif len(arguments.reqno) and records>
+						LEFT JOIN TPMDPERFORMANCE_EVALH EH
+							ON EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+							AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+							AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+						LEFT JOIN TPMDPERFORMANCE_EVALD ED
+							ON ED.form_no = EH.form_no
+							AND ED.company_code = EH.company_code
+							AND ED.lib_code = Z.apprlib_code
+							AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+							<cfif varcocode eq request.scookie.cocode>
+								<cfif len(arguments.reviewerempid)>
+									<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+										AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+									<cfelse>
+										AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+									</cfif>
+								</cfif>
+							</cfif>
+						</cfif>
+
+						LEFT JOIN TPMDPERIODAPPRLIB APPR
+							ON APPR.apprlib_code = Z.apprlib_code
+							AND APPR.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+							AND APPR.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+							AND APPR.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+						LEFT JOIN TPMDPERIODAPPRAISAL PA
+							ON PA.period_code = APPR.period_code
+							AND PA.company_code =APPR.company_code
+							AND PA.reference_date = APPR.reference_date
+							AND PA.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+							AND PA.apprlib_code = APPR.apprlib_code
+
+						ORDER BY Z.order_no, Z.depth, Z.apprlib_code, Z.appraisal_name
+					</cfquery>
+				<cfelse> <!---riz--->
+					<cfquery name="Local.qGetApprDefault" datasource="#request.sdsn#">
+						SELECT DISTINCT Z.appraisal_name AS libname, z.description,Z.apprlib_code AS libcode, Z.order_no,Z.parent_code AS pcode, Z.depth, Z.iscategory,
+							<!--- Add by Marc --->
+							(select negative_component from tpmmappraisal where appraisal_code = z.apprlib_code) as negative_component,
+							<cfif len(arguments.reqno) and records>
+								ED.target,
+								ED.achievement,
+								ED.score,
+								ED.weight,
+								ED.weightedscore,
+								ED.reviewer_empid,
+							<cfelse>
+								PA.target,
+								'' achievement,
+								'' score,
+								<cfif request.dbdriver eq 'ORACLE'>
+									CASE
+										WHEN PA.weight IS NOT NULL THEN PA.weight
+										WHEN APPR.weight IS NOT NULL THEN APPR.weight
+										ELSE 0
+									END weight,
+								<cfelse>
+									CASE
+										<!---
+										WHEN PA.weight IS NOT NULL AND PA.weight <> 0 THEN PA.weight
+										WHEN PA.weight = 0 AND APPR.weight IS NOT NULL AND APPR.weight <> 0 THEN APPR.weight
+										ELSE PA.weight
+										--->
+										WHEN PA.weight IS NOT NULL THEN PA.weight
+										WHEN APPR.weight IS NOT NULL THEN APPR.weight
+										ELSE '0'
+									END weight,
+								</cfif>
+								'0' weightedscore,
+								'#request.scookie.user.empid#' reviewer_empid,
+							</cfif>
+							CASE
+								WHEN PA.achievement_type IS NOT NULL THEN PA.achievement_type
+								ELSE APPR.achievement_type
+							END achscoretype,
+							PA.lookup_code AS lookupscoretype,
+
+							PA.editable_weight AS weightedit,
+							PA.editable_target AS targetedit
+						FROM
+						(
+							SELECT A.apprlib_code, A.parent_code, A.order_no, A.appraisal_name_#request.scookie.lang# appraisal_name,
+							A.appraisal_desc_#request.scookie.lang# description,A.appraisal_depth depth, A.iscategory
+							FROM TPMDPERIODAPPRLIB A
+							INNER JOIN TPMDPERIODAPPRAISAL PA
+								ON PA.period_code = A.period_code
+								AND PA.company_code =A.company_code
+								AND PA.reference_date = A.reference_date
+								AND PA.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+								AND PA.apprlib_code = A.apprlib_code
+							WHERE PA.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+								AND PA.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+								AND PA.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+
+							UNION ALL
+
+							SELECT A.apprlib_code, A.parent_code, A.order_no, A.appraisal_name_#request.scookie.lang# ,
+							A.appraisal_desc_#request.scookie.lang#,A.appraisal_depth, A.iscategory
+							FROM TPMDPERIODAPPRLIB A
+							INNER JOIN (
+								SELECT A.apprlib_code, A.parent_code, A.appraisal_name_#request.scookie.lang#,  A.appraisal_desc_#request.scookie.lang#,A.appraisal_depth, A.iscategory
+								FROM TPMDPERIODAPPRLIB A
+								INNER JOIN TPMDPERIODAPPRAISAL PA
+									ON PA.period_code = A.period_code
+									AND PA.company_code =A.company_code
+									AND PA.reference_date = A.reference_date
+									AND PA.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+									AND PA.apprlib_code = A.apprlib_code
+								WHERE PA.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+									AND PA.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+									AND PA.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+							) B ON A.apprlib_code = B.parent_code
+							WHERE A.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+								AND A.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+								AND A.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+						) Z
+						<cfif len(arguments.reqno) and records>
+						LEFT JOIN TPMDPERFORMANCE_EVALH EH
+							ON EH.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+							AND EH.request_no = <cfqueryparam value="#arguments.reqno#" cfsqltype="cf_sql_varchar">
+							AND EH.form_no = <cfqueryparam value="#arguments.formno#" cfsqltype="cf_sql_varchar">
+						LEFT JOIN TPMDPERFORMANCE_EVALD ED
+							ON ED.form_no = EH.form_no
+							AND ED.company_code = EH.company_code
+							AND ED.lib_code = Z.apprlib_code
+							AND upper(ED.lib_type) = <cfqueryparam value="#arguments.compcode#" cfsqltype="cf_sql_varchar">
+							<cfif varcocode eq request.scookie.cocode>
+								<cfif len(arguments.reviewerempid)>
+									<cfif showFromLastReviewer eq 1 and len(arguments.lastreviewer)>
+										AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.lastreviewer#" list="yes" cfsqltype="cf_sql_varchar">)
+									<cfelse>
+										AND ED.reviewer_empid IN (<cfqueryparam value="#arguments.reviewerempid#" list="yes" cfsqltype="cf_sql_varchar">)
+									</cfif>
+								</cfif>
+							</cfif>
+						</cfif>
+
+						LEFT JOIN TPMDPERIODAPPRLIB APPR
+							ON APPR.apprlib_code = Z.apprlib_code
+							AND APPR.period_code = <cfqueryparam value="#arguments.periodcode#" cfsqltype="cf_sql_varchar">
+							AND APPR.company_code = <cfqueryparam value="#request.scookie.cocode#" cfsqltype="cf_sql_varchar">
+							AND APPR.reference_date = <cfqueryparam value="#arguments.refdate#" cfsqltype="cf_sql_timestamp">
+						LEFT JOIN TPMDPERIODAPPRAISAL PA
+							ON PA.period_code = APPR.period_code
+							AND PA.company_code =APPR.company_code
+							AND PA.reference_date = APPR.reference_date
+							AND PA.position_id = <cfqueryparam value="#empposid#" cfsqltype="cf_sql_integer">
+							AND PA.apprlib_code = APPR.apprlib_code
+						ORDER BY Z.order_no,  Z.depth, Z.apprlib_code, Z.appraisal_name
+					</cfquery>
+				<!----<cf_sfwritelog dump="qGetApprDefault" prefix="qGetApprDefault" > ---->
+				</cfif> <!---riz--->
+
+			</cfif>
+			<cfreturn qGetApprDefault>
+		</cfif>
+
+	</cffunction>
+
+	<cffunction name="saveEvalD">
+		<cfargument name="libtype" default="">
+		<cfargument name="listlib" default="">
+		<cfargument name="strckEval" default="">
+		<cfargument name="strJSON" default="">
+		<cfargument name="existInPlan" default="false">
+		<cfset local.strckEvalD = structnew()>
+		<cfset strckEvalD["form_no"] = strckEval.form_no>
+		<cfset strckEvalD["company_code"] = strckEval.company_code>
+		<cfset strckEvalD["coid"] = strckEval.coid>
+		<cfset strckEvalD["reviewer_empid"] = strckEval.reviewer_empid>
+		<cfset strckEvalD["reviewer_posid"] = strckEval.reviewer_posid>
+		<cfset strckEvalD["lib_type"] = ucase(arguments.libtype)>
+		<!--- anomali --->
+		<cfif len(arguments.strJSON) and left(arguments.strJSON,1) eq " ">
+			<cfset strJSON = Replace(strJSON, " ", "" ,"one")>
+		</cfif>
+		<cfset local.objJSON = deserializeJSON(strJSON)>
+		<cfif len(arguments.listlib) and left(arguments.listlib,1) eq " ">
+			<cfset listlib = Replace(listlib, " ", "" ,"one")>
+		</cfif>
+
+		<cfset local.inputPrefix = "">
+		<cfif ucase(libtype) eq "APPRAISAL">
+			<cfset inputPrefix = "appr">
+		<cfelseif ucase(libtype) eq "ORGKPI">
+			<cfset inputPrefix = "org">
+		<cfelseif ucase(libtype) eq "PERSKPI">
+			<cfset inputPrefix = "pers">
+		<cfelseif ucase(libtype) eq "COMPETENCY">
+			<cfset inputPrefix = "comp">
+		</cfif>
+
+		<cfquery name="local.qFromPlan" datasource="#request.sdsn#">
+			SELECT  reviewer_empid,request_no FROM TPMDPERFORMANCE_PLANH
+			WHERE form_no = <cfqueryparam value="#strckEvalD.form_no#" cfsqltype="cf_sql_varchar">
+				AND company_code = <cfqueryparam value="#strckEvalD.company_code#" cfsqltype="cf_sql_varchar">
+				AND reviewee_empid = <cfqueryparam value="#strckEval.reviewee_empid#" cfsqltype="cf_sql_varchar">
+				AND isfinal = 1
+		</cfquery>
+
+		<!--- ambil library details baik dari plan jika ada/ dari period lib langsung --->
+		<cfif arguments.existInPlan and UCASE(libtype) eq "PERSKPI">
+			<cfquery name="local.qGetLibraryDetails" datasource="#request.sdsn#">
+				SELECT * FROM TPMDPERFORMANCE_PLAND
+				WHERE form_no = <cfqueryparam value="#strckEvalD.form_no#" cfsqltype="cf_sql_varchar">
+					AND company_code = <cfqueryparam value="#strckEvalD.company_code#" cfsqltype="cf_sql_varchar">
+					AND UPPER(lib_type) = 'PERSKPI'
+					AND reviewer_empid = <cfqueryparam value="#qFromPlan.reviewer_empid#" cfsqltype="cf_sql_varchar">
+					AND request_no = <cfqueryparam value="#qFromPlan.request_no#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+			<cfif qGetLibraryDetails.recordcount eq 0>
+				<cfquery name="local.qGetLibraryDetails" datasource="#request.sdsn#">
+				SELECT * FROM TPMDPERFORMANCE_PLAND
+				WHERE form_no = <cfqueryparam value="#strckEvalD.form_no#" cfsqltype="cf_sql_varchar">
+				AND company_code = <cfqueryparam value="#strckEvalD.company_code#" cfsqltype="cf_sql_varchar">
+				AND UPPER(lib_type) = 'PERSKPI'
+
+				AND request_no = <cfqueryparam value="#qFromPlan.request_no#" cfsqltype="cf_sql_varchar">
+				</cfquery>
+			</cfif>
+
+		<cfelseif arguments.existInPlan and UCASE(libtype) eq "ORGKPI">
+			<cfquery name="local.qGetOrgUnit" datasource="#request.sdsn#">
+				SELECT DISTINCT dept_id FROM TEOMPOSITION
+				WHERE position_id = <cfqueryparam value="#strckEval.reviewee_posid#" cfsqltype="cf_sql_integer">
+					AND company_id = <cfqueryparam value="#strckEval.coid#" cfsqltype="cf_sql_integer">
+			</cfquery>
+			<cfquery name="local.qGetLibraryDetails" datasource="#request.sdsn#">
+				SELECT * FROM TPMDPERFORMANCE_PLANKPI
+				WHERE orgunit_id = <cfqueryparam value="#qGetOrgUnit.dept_id#" cfsqltype="cf_sql_integer">
+					AND company_code = <cfqueryparam value="#strckEvalD.company_code#" cfsqltype="cf_sql_varchar">
+					AND period_code = <cfqueryparam value="#strckEval.period_code#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+		<cfelseif listfindnocase("PERSKPI,ORGKPI",libtype)>
+			<cfquery name="local.qGetLibraryDetails" datasource="#request.sdsn#">
+				SELECT kpi_name_en AS lib_name_en,
+					kpi_name_id AS lib_name_id,
+					kpi_name_my AS lib_name_my,
+					kpi_name_th AS lib_name_th,
+					kpi_desc_en AS lib_desc_en,
+					kpi_desc_id AS lib_desc_id,
+					kpi_desc_my AS lib_desc_my,
+					kpi_desc_th AS lib_desc_th,
+					kpilib_code AS lib_code,
+					iscategory,
+					kpi_depth AS lib_depth,
+					parent_code,
+					parent_path
+				FROM TPMDPERIODKPILIB
+				WHERE company_code = <cfqueryparam value="#strckEvalD.company_code#" cfsqltype="cf_sql_varchar">
+					AND period_code = <cfqueryparam value="#strckEval.period_code#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+		<cfelseif libtype eq "APPRAISAL">
+			<cfquery name="local.qGetLibraryDetails" datasource="#request.sdsn#">
+				SELECT appraisal_name_en AS lib_name_en,
+					appraisal_name_id AS lib_name_id,
+					appraisal_name_my AS lib_name_my,
+					appraisal_name_th AS lib_name_th,
+					appraisal_desc_en AS lib_desc_en,
+					appraisal_desc_id AS lib_desc_id,
+					appraisal_desc_my AS lib_desc_my,
+					appraisal_desc_th AS lib_desc_th,
+					apprlib_code AS lib_code,
+					iscategory,
+					appraisal_depth AS lib_depth,
+					parent_code,
+					parent_path
+				FROM TPMDPERIODAPPRLIB
+				WHERE company_code = <cfqueryparam value="#strckEvalD.company_code#" cfsqltype="cf_sql_varchar">
+					AND period_code = <cfqueryparam value="#strckEval.period_code#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+		<cfelseif libtype eq "COMPETENCY">
+			<cfquery name="local.qGetLibraryDetails" datasource="#request.sdsn#">
+				SELECT competence_name_en AS lib_name_en,
+					competence_name_id AS lib_name_id,
+					competence_name_my AS lib_name_my,
+					competence_name_th AS lib_name_th,
+					competence_desc_en AS lib_desc_en,
+					competence_desc_id AS lib_desc_id,
+					competence_desc_my AS lib_desc_my,
+					competence_desc_th AS lib_desc_th,
+					competence_code AS lib_code,
+					iscategory,
+					competence_depth AS lib_depth,
+					parent_code,
+					parent_path
+				FROM TPMMCOMPETENCE
+			</cfquery>
+		</cfif>
+
+		<cfloop list="#arguments.listlib#" index="local.idxLib">
+			<cfquery name="local.qGetLibDetail" dbtype="query">
+				SELECT *
+				FROM qGetLibraryDetails
+				WHERE lib_code = <cfqueryparam value="#idxLib#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+
+			<cfset strckEvalD["lib_code"] = idxLib>
+
+			<cfif UCASE(qGetLibDetail.iscategory) eq "N" OR qGetLibDetail.iscategory eq "" >
+				<cfif structkeyexists(objJSON,"#inputPrefix#_weight_#idxLib#")>
+					<cfset strckEvalD["weight"]  = objJSON["#inputPrefix#_weight_#idxLib#"]>
+				<cfelse>
+					<cfset strckEvalD["weight"]  = 0>
+				</cfif>
+				<cfif structkeyexists(objJSON,"#inputPrefix#_achievement_#idxLib#")>
+					<cfset strckEvalD["achievement"]  = objJSON["#inputPrefix#_achievement_#idxLib#"]>
+				<cfelse>
+					<cfset strckEvalD["achievement"]  = 0>
+				</cfif>
+				<cfif structkeyexists(objJSON,"#inputPrefix#_score_#idxLib#")>
+					<cfset strckEvalD["score"] = objJSON["#inputPrefix#_score_#idxLib#"]>
+				<cfelse>
+					<cfset strckEvalD["score"] = 0>
+				</cfif>
+
+
+				<cfif structkeyexists(objJSON,"#inputPrefix#_weightedscore_#idxLib#")>
+					<cfset strckEvalD["weightedscore"] = objJSON["#inputPrefix#_weightedscore_#idxLib#"]>
+				<cfelse>
+					<cfset strckEvalD["weightedscore"] = 0>
+				</cfif>
+				<cfif structkeyexists(objJSON,"#inputPrefix#_target_#idxLib#")>
+					<cfset strckEvalD["target"] = objJSON["#inputPrefix#_target_#idxLib#"]>
+				<cfelse>
+					<cfset strckEvalD["target"] = 0>
+				</cfif>
+
+				<cfif structkeyexists(objJSON,"#inputPrefix#_note_#idxLib#")>
+						<cfset strckEvalD["notes"] = objJSON["#inputPrefix#_note_#idxLib#"]>
+				<cfelse>
+						<cfset strckEvalD["notes"] = "">
+				</cfif>
+
+
+				<!--- Add By Marc --->
+				<cfif structkeyexists(objJSON,"#inputPrefix#_actionresult_#idxLib#")>
+						<cfset strckEvalD["actionresult"] = objJSON["#inputPrefix#_actionresult_#idxLib#"]>
+				<cfelse>
+						<cfset strckEvalD["actionresult"] = "">
+				</cfif>
+				<!--- Add By Marc --->
+
+				<cfif listfindnocase("APPRAISAL,ORGKPI,PERSKPI",libtype)>
+					<cfif structkeyexists(objJSON,"#inputPrefix#_achtype_#idxLib#")>
+							<cfset strckEvalD["achievement_type"] = objJSON["#inputPrefix#_achtype_#idxLib#"]>
+					<cfelse>
+							<cfset strckEvalD["achievement_type"] = "">
+					</cfif>
+					<cfif structkeyexists(objJSON,"#inputPrefix#_looktype_#idxLib#")>
+							<cfset strckEvalD["lookup_code"] = objJSON["#inputPrefix#_looktype_#idxLib#"]>
+					<cfelse>
+							<cfset strckEvalD["lookup_code"] = "">
+					</cfif>
+				</cfif>
+			<cfelse>
+				<cfset strckEvalD["weight"] = "">
+				<cfset strckEvalD["achievement"] = "">
+				<cfset strckEvalD["score"] = "">
+				<cfset strckEvalD["weightedscore"] = 0>
+				<cfset strckEvalD["target"] = "">
+				<cfset strckEvalD["notes"] = "">
+				<cfif listfindnocase("APPRAISAL,ORGKPI,PERSKPI",libtype)>
+					<cfset strckEvalD["achievement_type"] = "">
+					<cfset strckEvalD["lookup_code"] = "">
+				</cfif>
+			</cfif>
+
+			<cfset strckEvalD["lib_name_en"] = qGetLibDetail.lib_name_en>
+			<cfset strckEvalD["lib_name_id"] = qGetLibDetail.lib_name_id>
+			<cfset strckEvalD["lib_name_my"] = qGetLibDetail.lib_name_my>
+			<cfset strckEvalD["lib_name_th"] = qGetLibDetail.lib_name_th>
+			<cfset strckEvalD["lib_desc_en"] = qGetLibDetail.lib_desc_en>
+			<cfset strckEvalD["lib_desc_id"] = qGetLibDetail.lib_desc_id>
+			<cfset strckEvalD["lib_desc_my"] = qGetLibDetail.lib_desc_my>
+			<cfset strckEvalD["lib_desc_th"] = qGetLibDetail.lib_desc_th>
+			<cfset strckEvalD["iscategory"] = qGetLibDetail.iscategory>
+			<cfset strckEvalD["lib_depth"] = qGetLibDetail.lib_depth>
+			<cfset strckEvalD["parent_code"] = qGetLibDetail.parent_code>
+			<cfset strckEvalD["parent_path"] = qGetLibDetail.parent_path>
+
+			<!--- <cfset local.retvar = variables.objPerfEvalD.Insert(strckEvalD)> --->
+
+			<cfquery name="local.qInsertEvalD" datasource="#request.sdsn#">
+				INSERT INTO TPMDPERFORMANCE_EVALD (form_no,reviewer_empid,reviewer_posid,lib_code,lib_type,company_code,weight,achievement,score,weightedscore,target,notes,created_by,created_date,modified_by,modified_date,lib_name_en,lib_desc_en,iscategory,lib_depth,parent_code,parent_path,achievement_type,lookup_code)
+				VALUES (
+					<cfqueryparam value="#strckEvalD.form_no#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.reviewer_empid#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.reviewer_posid#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.lib_code#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.lib_type#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.company_code#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.weight#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.achievement#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.score#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.weightedscore#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.target#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.notes#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+					#now()#,
+					<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+					#now()#,
+					<cfqueryparam value="#strckEvalD.lib_name_en#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.lib_desc_en#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.iscategory#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.lib_depth#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.parent_code#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.parent_path#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.achievement_type#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.lookup_code#" cfsqltype="cf_sql_varchar">
+
+
+				)
+			</cfquery>
+
+			<!--- input ke TEOREMPCOMPETENCE--->
+			<cfif ucase(libtype) eq "COMPETENCY">
+				<cfif len(strckEvalD.achievement)>
+				<cfquery name="Local.qDelEmpCompt" datasource="#request.sdsn#">
+					DELETE FROM TEOREMPCOMPETENCE
+					WHERE emp_id = <cfqueryparam value="#strckEval.reviewee_empid#" cfsqltype="cf_sql_varchar">
+						AND competence_code = <cfqueryparam value="#strckEvalD.lib_code#" cfsqltype="cf_sql_varchar">
+				</cfquery>
+				<cfquery name="Local.qInsertEmpCompt" datasource="#request.sdsn#">
+					INSERT INTO TEOREMPCOMPETENCE
+					(emp_id, competence_code, point_value, created_by, created_date, modified_by, modified_date)
+					VALUES
+					(
+					<cfqueryparam value="#strckEval.reviewee_empid#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.lib_code#" cfsqltype="cf_sql_varchar">,
+					<cfqueryparam value="#strckEvalD.achievement#" cfsqltype="cf_sql_integer">,
+					<cfqueryparam value="#request.scookie.user.uname#" cfsqltype="cf_sql_varchar">,
+					<cfif request.dbdriver EQ "MSSQL">getdate()<cfelse>now()</cfif>,
+					<cfqueryparam value="#request.scookie.user.uname#" cfsqltype="cf_sql_varchar">,
+					<cfif request.dbdriver EQ "MSSQL">getdate()<cfelse>now()</cfif>
+					)
+				</cfquery>
+				</cfif>
+			</cfif>
+		</cfloop>
+	</cffunction>
+
+	<cffunction name="Revise">
+		<cfset local.reqno = FORM.request_no/>
+		<cfset local.formno = FORM.formno/>
+		<cfset local.requestfor = FORM.requestfor/>
+		<cfset local.periodcode = FORM.period_code/>
+		<cfset local.refdate = FORM.reference_date/>
+
+		<cftransaction>
+		<cfquery name="local.qCheckRequest" datasource="#request.sdsn#">
+			SELECT approval_data, approval_list, approved_list, outstanding_list, approved_data FROM TCLTREQUEST
+			WHERE company_id =<cfqueryparam value="#FORM.coid#" cfsqltype="cf_sql_varchar"> <!---modified by  ENC51115-79853 --->
+			AND company_code = <cfqueryparam value="#FORM.cocode#" cfsqltype="cf_sql_varchar"> <!---modified by  ENC51115-79853 --->
+			AND req_type = 'PERFORMANCE.EVALUATION'
+			AND req_no = <cfqueryparam value="#reqno#" cfsqltype="cf_sql_varchar">
+			AND reqemp = <cfqueryparam value="#requestfor#" cfsqltype="cf_sql_varchar">
+
+		</cfquery>
+
+		<cfset LOCAL.strckData = FORM/>
+
+		<cfquery name="local.qSelStepHigher" datasource="#request.sdsn#">
+			SELECT reviewer_empid FROM TPMDPERFORMANCE_EVALH
+			WHERE form_no = <cfqueryparam value="#strckData.formno#" cfsqltype="cf_sql_varchar">
+			AND request_no = <cfqueryparam value="#strckData.request_no#" cfsqltype="cf_sql_varchar">
+			AND review_step > <cfqueryparam value="#strckData.USERINREVIEWSTEP#" cfsqltype="cf_sql_varchar">
+			AND company_code =  <cfqueryparam value="#form.cocode#" cfsqltype="cf_sql_varchar">
+		</cfquery>
+
+		<cfloop query="qSelStepHigher">
+			<cfquery name="local.qDelPlanD" datasource="#request.sdsn#">
+				DELETE FROM  TPMDPERFORMANCE_EVALD
+				WHERE form_no = <cfqueryparam value="#strckData.formno#" cfsqltype="cf_sql_varchar">
+				AND reviewer_empid = <cfqueryparam value="#qSelStepHigher.reviewer_empid#" cfsqltype="cf_sql_varchar">
+				AND company_code =  <cfqueryparam value="#form.cocode#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+
+			<cfquery name="local.qDelPlanD" datasource="#request.sdsn#">
+				DELETE FROM  TPMDPERFORMANCE_EVALH
+				WHERE form_no = <cfqueryparam value="#strckData.formno#" cfsqltype="cf_sql_varchar">
+				AND request_no = <cfqueryparam value="#strckData.request_no#" cfsqltype="cf_sql_varchar">
+				AND reviewer_empid = <cfqueryparam value="#qSelStepHigher.reviewer_empid#" cfsqltype="cf_sql_varchar">
+				AND company_code = <cfqueryparam value="#form.cocode#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+		</cfloop>
+
+		<cfquery name="local.qGetSPMH" datasource="#request.sdsn#">
+			SELECT reviewer_empid, review_step, request_no FROM TPMDPERFORMANCE_EVALH
+			WHERE request_no = <cfqueryparam value="#reqno#" cfsqltype="cf_sql_varchar">
+			AND reviewee_empid = <cfqueryparam value="#requestfor#" cfsqltype="cf_sql_varchar">
+			AND company_code = <cfqueryparam value="#FORM.cocode#" cfsqltype="cf_sql_varchar"> <!---modified by  ENC51115-79853 --->
+			AND head_status = 1
+			ORDER BY review_step ASC
+		</cfquery>
+
+		<cfset local.new_outstanding =  qCheckRequest.outstanding_list/>
+		<cfset local.new_approved =  qCheckRequest.approved_list/>
+
+		<cfset LOCAL.arr_approvaldata=SFReqFormat(qCheckRequest.approval_data,"R",[])>
+		<!---TW:<cfwddx action="wddx2cfml" input="#qCheckRequest.approval_data#" output="arr_approvaldata">--->
+		<cfset local.strckAppr = ApprovalLoop(arr_approvaldata,request.scookie.user.empid)/>
+		<cfset local.userindbstep = strckAppr.empinstep>
+		<cfif not listfindnocase(strckAppr.fullapproverlist,requestfor) and listfindnocase(valuelist(qGetSPMH.reviewer_empid),requestfor)>
+			<cfset userindbstep++>
+		</cfif>
+
+		<!--- di wddx, yang akan dihapus "approvedby"-nya adalah --->
+		<cfset local.steptosetrevised = 0>
+		<cfif listfindnocase(valuelist(qGetSPMH.review_step),userindbstep) gt 1>
+			<cfset steptosetrevised = listgetat(valuelist(qGetSPMH.review_step),listfindnocase(valuelist(qGetSPMH.review_step),userindbstep)-1)>
+		<cfelseif listlen(valuelist(qGetSPMH.review_step)) gt 0>
+			<cfset steptosetrevised = listlast(valuelist(qGetSPMH.review_step))>
+		</cfif>
+		<cfif userindbstep - strckAppr.empinstep eq 1 and steptosetrevised eq 1>
+			<cfset steptosetrevised = 0>
+		<cfelseif userindbstep - strckAppr.empinstep eq 1>
+			<cfset --steptosetrevised>
+		</cfif>
+
+		<!--- update head status reviewer sebelumnya jadi 0 --->
+		<!---   <cfquery name="local.qUpdHeadStatus" datasource="#request.sdsn#">
+			UPDATE TPMDPERFORMANCE_EVALH
+			SET head_status = 0
+			WHERE request_no = <cfqueryparam value="#reqno#" cfsqltype="cf_sql_varchar">
+				AND period_code = <cfqueryparam value="#periodcode#" cfsqltype="cf_sql_varchar">
+				AND company_code = <cfqueryparam value="#Form.cocode#" cfsqltype="cf_sql_varchar"> <!---modified by  ENC51115-79853 --->
+				AND reviewee_empid = <cfqueryparam value="#requestfor#" cfsqltype="cf_sql_varchar">
+				<cfif steptosetrevised neq 0>
+					AND reviewer_empid IN (
+						SELECT emp_id FROM TEOMEMPPERSONAL WHERE user_id = <cfqueryparam value="#arr_approvaldata[steptosetrevised].approvedby#" cfsqltype="cf_sql_varchar">
+					)
+				<cfelse>
+					AND reviewer_empid = <cfqueryparam value="#requestfor#" cfsqltype="cf_sql_varchar">
+				</cfif>
+		</cfquery> ----->
+
+		<!--- TCK0818-81809 --->
+		<cfset variables.sendtype = 'next'>
+		<cfset strckData.isfinal = 0/>
+		<cfset strckData.head_status = 0/>
+		<cfset strckData.isfinal_requestno = 1/>
+
+		<cfset SaveTransaction(50,strckData)/>
+		<!--- TCK0818-81809 --->
+
+		<!---<cfoutput><script>alert("yan #steptosetrevised# -- #requestfor# -- #form_code# -- #reqno#");</script></cfoutput><CF_SFABORT>--->
+
+		<cfif steptosetrevised neq 0>
+			<!--- update last reviewer, modified_date untuk revised jadi si user --->
+			<cfquery name="local.qUpdHeadStatus" datasource="#request.sdsn#">
+				UPDATE TPMDPERFORMANCE_EVALH
+				SET modified_date = <cfqueryparam value="#now()#" cfsqltype="cf_sql_timestamp">
+				WHERE request_no = <cfqueryparam value="#reqno#" cfsqltype="cf_sql_varchar">
+				AND period_code = <cfqueryparam value="#periodcode#" cfsqltype="cf_sql_varchar">
+				AND company_code = <cfqueryparam value="#Form.cocode#" cfsqltype="cf_sql_varchar"> <!---modified by  ENC51115-79853 --->
+				AND reviewee_empid = <cfqueryparam value="#requestfor#" cfsqltype="cf_sql_varchar">
+				AND reviewer_empid = <cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+
+			<cfset local.uidtorevised = arr_approvaldata[steptosetrevised].approvedby>
+			<cfset arr_approvaldata[steptosetrevised].approvedby = ""/>
+			<cfset LOCAL.new_approvaldata=SFReqFormat(arr_approvaldata,"W")>
+			<!---TW:<cfwddx action="cfml2wddx" input="#arr_approvaldata#" output="new_approvaldata">--->
+			<cfset new_outstanding =  uidtorevised&","&new_outstanding/>
+			<cfif listlen(new_approved) and listfindnocase(new_approved,uidtorevised)>
+				<cfset new_approved =  listdeleteat(new_approved,listfindnocase(new_approved,uidtorevised))/>
+			</cfif>
+
+		<cfelse>
+			<cfquery name="local.qGetUserId" datasource="#request.sdsn#">
+				SELECT DISTINCT user_id FROM TEOMEMPPERSONAL
+				WHERE emp_id = <cfqueryparam value="#requestfor#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+
+			<cfset new_outstanding =  qGetUserId.user_id&","&new_outstanding/>
+		</cfif>
+
+		<!--- set approved_data --->
+		<cfset LOCAL.strckApprovedData=SFReqFormat(qCheckRequest.approved_data,"R")>
+		<cfset var strckFormInbox = StructNew() />
+		<cfset strckFormInbox['DTIME'] = Now() />
+		<cfset strckFormInbox['DECISION'] = 3 />
+		<cfif structkeyexists(FORM,"revisingNotes")>
+			<cfset strckFormInbox['NOTES'] = Form.revisingNotes />
+		<cfelse>
+			<cfset strckFormInbox['NOTES'] = "-" />
+		</cfif>
+		<cfset strckApprovedData[request.scookie.user.uid] = strckFormInbox />
+		<cfset LOCAL.wddxApprovedData=SFReqFormat(strckApprovedData,"W")>
+		<!---TW:
+		<cfif IsWDDX(qCheckRequest.approved_data)>
+			<cfwddx action="wddx2cfml" input="#qCheckRequest.approved_data#" output="strckApprovedData">
+
+			<cfset var strckFormInbox = StructNew() />
+			<cfset strckFormInbox['DTIME'] = Now() />
+			<cfset strckFormInbox['DECISION'] = 3 />
+			<cfif structkeyexists(FORM,"revisingNotes")>
+				<cfset strckFormInbox['NOTES'] = Form.revisingNotes />
+			<cfelse>
+				<cfset strckFormInbox['NOTES'] = "-" />
+			</cfif>
+
+			<cfset strckApprovedData[request.scookie.user.uid] = strckFormInbox />
+			<cfwddx action="cfml2wddx" input="#strckApprovedData#" output="wddxApprovedData">
+		<cfelse>
+			<cfset strckApprovedData = structnew()>
+			<cfset var strckFormInbox = StructNew() />
+			<cfset strckFormInbox['DTIME'] = Now() />
+			<cfset strckFormInbox['DECISION'] = 3 />
+			<cfif structkeyexists(FORM,"revisingNotes")>
+				<cfset strckFormInbox['NOTES'] = Form.revisingNotes />
+			<cfelse>
+				<cfset strckFormInbox['NOTES'] = "-" />
+			</cfif>
+			<cfset strckApprovedData[request.scookie.user.uid] = strckFormInbox />
+			<cfwddx action="cfml2wddx" input="#strckApprovedData#" output="wddxApprovedData">
+		</cfif>--->
+
+		<cfquery name="local.qUpdRequest" datasource="#request.sdsn#">
+			UPDATE TCLTREQUEST SET
+			<!---TW:<cfif isWDDX(wddxApprovedData)></cfif>--->
+				approved_data = <cfqueryparam value="#wddxApprovedData#" cfsqltype="cf_sql_varchar">,
+			<cfif steptosetrevised neq 0>
+				approval_data = <cfqueryparam value="#new_approvaldata#" cfsqltype="cf_sql_varchar">,
+				approved_list = <cfqueryparam value="#new_approved#" cfsqltype="cf_sql_varchar">,
+			<cfelse>
+				approved_list = '',
+			</cfif>
+			outstanding_list = <cfqueryparam value="#new_outstanding#" cfsqltype="cf_sql_varchar">,
+			status = 4,
+			modified_date = <cfqueryparam value="#now()#" cfsqltype="cf_sql_timestamp">,
+			modified_by = <cfqueryparam value="#REQUEST.SCOOKIE.USER.UNAME#" cfsqltype="cf_sql_varchar">
+			WHERE company_id = <cfqueryparam value="#Form.coid#" cfsqltype="cf_sql_varchar"> <!---modified by  ENC51115-79853 --->
+				AND company_code = <cfqueryparam value="#Form.cocode#" cfsqltype="cf_sql_varchar"> <!---modified by  ENC51115-79853 --->
+				AND req_type = 'PERFORMANCE.EVALUATION'
+				AND req_no = <cfqueryparam value="#reqno#" cfsqltype="cf_sql_varchar">
+				AND reqemp = <cfqueryparam value="#requestfor#" cfsqltype="cf_sql_varchar">
+
+		</cfquery>
+
+		<!--- delete record final jika ada --->
+		<cfquery name="local.qDelFinalRec" datasource="#request.sdsn#">
+			DELETE FROM TPMDPERFORMANCE_FINAL
+			WHERE form_no = <cfqueryparam value="#formno#" cfsqltype="cf_sql_varchar">
+		</cfquery>
+		<cfquery name="LOCAL.qGetDataRequest" datasource="#request.sdsn#">
+			SELECT seq_id, req_no, status,outstanding_list, company_id, email_list, approval_list FROM TCLTREQUEST
+			WHERE  req_no = <cfqueryparam value="#reqno#" cfsqltype="cf_sql_varchar">
+		</cfquery>
+		<cfset tempSendEmail = ReviseApprovedNotif({mailtmpltRqster="ReviseRequestNotificationTer",mailtmpltRqstee="ReviseRequestNotificationTee",mailtmpltAprvr="ReviseRequestNotification",notiftmpltRqster="7",notiftmpltRqstee="8",notiftmpltAprvr="9",strRequestNo=reqno,iStatusOld=qGetDataRequest.status,lstNextApprover=qGetDataRequest.outstanding_list,requestcoid=qGetDataRequest.company_id,requestId=qGetDataRequest.seq_id,lastOutstanding=ListLast(qGetDataRequest.outstanding_list)})>
+		</cftransaction>
+
+
+			<!---- start Condition : New Layout Performance Evaluation Form  ------>
+			<cfset local.strMessage = Application.SFParser.TransMLang("JSSuccessfully revising request for previous reviewer",true)>
+			<cfif REQUEST.CONFIG.NEWLAYOUT_PERFORMANCE eq 0>
+				<cfoutput>
+					<script>
+						alert("#strMessage#");
+						popClose();
+						refreshPage();
+					</script>
+				</cfoutput>
+			<cfelse>
+				<cfscript>
+					data = {"success"="1","MSG"="#strMessage#"};
+				</cfscript>
+				<cfoutput>
+					#SerializeJSON(data)#
+				</cfoutput>
+			</cfif>
+			<!---- End Condition : New Layout Performance Evaluation Form  ------>
+
+	</cffunction>
+
+		<!--- <cffunction name="SaveTransaction">
+	    	<cfargument name="iAction" type="numeric" required="yes">
+	    	<cfargument name="strckFormData" type="struct" required="yes">
+	    	<cfparam name="action" default="0">
+	    	<cfparam name="sendtype" default="0">
+	    	<cfset local.existInPlan = false>
+			<cfset local.nhead_status = 0>
+
+			<!--- Add by Marc --->
+			<cfset debug = 1>
+			<cfset stop = 1>
+			<cfif debug eq 1 ><cfdump var='#strckFormData#' label='strckFormData' expand='yes'></cfif>
+
+
+	        <cfif sendtype eq 'directfinal'>
+	        	<cfset strckFormData.isfinal = 1/>
+	        	<cfset strckFormData.head_status = 1/>
+				<cfset nhead_status = 1>
+	        <cfelseif action eq 'sendtoapprover' or sendtype eq 'next'>
+	        	<cfset strckFormData.head_status = 1/>
+				<cfset nhead_status = 1>
+			<cfelseif action eq 'draft'>
+				<cfset nhead_status = 1>
+				<cfset strckFormData.head_status = 0/>
+	        </cfif>
+
+			<cfquery name="local.qDetailReviewee" datasource="#request.sdsn#">
+				SELECT  grade_code, employ_code, position_id
+				FROM TEODEMPCOMPANY
+				WHERE emp_id = <cfqueryparam value="#strckFormData.requestfor#" cfsqltype="cf_sql_varchar">
+				and status = 1
+			</cfquery>
+			<cfquery name="local.qDetailReviewer" datasource="#request.sdsn#">
+				SELECT  position_id
+				FROM TEODEMPCOMPANY
+				WHERE emp_id = <cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">
+			</cfquery>
+
+			<cfif (listfindnocase(ucase(listPeriodComponentUsed),"ORGKPI") or listfindnocase(ucase(listPeriodComponentUsed),"PERSKPI")) and nhead_status eq 1>
+	            <cfset local.retvar = cekOrgPersKPI(FORM.period_code,strckFormData.reference_date,strckFormData.requestfor,qDetailReviewee.position_id,FORM.coid,FORM.cocode)>
+	        </cfif>
+
+	        <!--- cek if exist in plan --->
+	        <cfif len(strckFormData["planformno"])>
+	        	<cfset existInPlan = true>
+			<cfelseif len(strckFormData["formno"])>
+				<cfset existInPlan = true>
+	        </cfif>
+
+	        <!--- insert tabel header --->
+			<cfset local.strckHeadData = StructNew()>
+	        <cfif len(strckFormData["formno"])>
+				<cfset strckHeadData["form_no"] = strckFormData.formno>
+	        <cfelseif len(strckFormData["planformno"])>
+				<cfset strckHeadData["form_no"] = strckFormData.planformno>
+	        <cfelse>
+				<cfset strckHeadData["form_no"] = trim(Application.SFUtil.getCode("PERFEVALFORM",'no','true'))>
+	        </cfif>
+
+	        <!---
+	        <cfif not len(strckFormData["formno"])>
+				<cfset strckHeadData["form_no"] = trim(Application.SFUtil.getCode("PERFEVALFORM",'no','true'))>
+	        <cfelse>
+				<cfset strckHeadData["form_no"] = strckFormData.formno>
+	        </cfif>
+			--->
+
+			<cfset strckHeadData["request_no"] = request_no><!--- ? --->
+			<cfset strckHeadData["form_order"] = 1>
+			<cfset strckHeadData["reference_date"] = strckFormData.reference_date>
+			<cfset strckHeadData["period_code"] = FORM.period_code>
+			<cfset strckHeadData["company_code"] = FORM.cocode> <!---modified by  ENC51115-79853 --->
+			<cfset strckHeadData["coid"] = FORM.coid> <!---added by  ENC51115-79853 --->
+			<cfset strckHeadData["reviewee_empid"] = strckFormData.requestfor>
+			<cfset strckHeadData["reviewee_posid"] = qDetailReviewee.position_id>
+			<cfset strckHeadData["reviewee_grade"] = qDetailReviewee.grade_code>
+			<cfset strckHeadData["reviewee_employcode"] = qDetailReviewee.employ_code>
+			<cfset strckHeadData["reviewer_empid"] = request.scookie.user.empid>
+			<cfset strckHeadData["reviewer_posid"] = qDetailReviewer.position_id>
+			<cfset strckHeadData["score"] = strckFormData.score>
+			<cfset strckHeadData["conclusion"] = strckFormData.conclusion>
+	    	<cfset strckHeadData["review_step"] = strckFormData.UserInReviewStep/>
+	        <cfif structkeyexists(strckFormData,"isfinal")>
+		    	<cfset strckHeadData["isfinal"] = strckFormData.isfinal/>
+	        <cfelse>
+		    	<cfset strckHeadData["isfinal"] = 0/>
+	        </cfif>
+	        <cfif structkeyexists(strckFormData,"head_status")>
+		    	<cfset strckHeadData["head_status"] = strckFormData.head_status/>
+	        <cfelse>
+		    	<cfset strckHeadData["head_status"] = 0/>
+	        </cfif>
+			<cfset strckHeadData["lastreviewer_empid"] = request.scookie.user.empid>
+
+	        <cfset local.listlibtype="0">
+	        <cfloop list="#listPeriodComponentUsed#" index="local.idxComp">
+	            <cfif ucase(idxComp) neq "TASK" and ucase(idxComp) neq "FEEDBACK">
+	                <cfset local.listexist = evaluate("#idxComp#_lib")>
+	                <cfif listlen(trim(listexist))>
+	                    <cfset listlibtype = listAppend(listLibType,idxComp)>
+	                </cfif>
+	            </cfif>
+	        </cfloop>
+
+	        <cftransaction>
+
+	      	<cfquery name="local.qDelDataBefore" datasource="#request.sdsn#">
+	           	DELETE FROM TPMDPERFORMANCE_EVALNOTE
+	            WHERE form_no = <cfqueryparam value="#strckHeadData.form_no#" cfsqltype="cf_sql_varchar">
+	                 AND reviewer_empid = <cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">
+					 AND company_code = <cfqueryparam value="#FORM.cocode#" cfsqltype="cf_sql_varchar">  <!----added by  ENC51115-79853 --->
+	        </cfquery>
+	        <cfquery name="local.qDelDataBefore" datasource="#request.sdsn#">
+	           	DELETE FROM TPMDPERFORMANCE_EVALD
+	            WHERE form_no = <cfqueryparam value="#strckHeadData.form_no#" cfsqltype="cf_sql_varchar">
+	                AND reviewer_empid = <cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">
+	                AND company_code = <cfqueryparam value="#FORM.cocode#" cfsqltype="cf_sql_varchar">  <!----added by  ENC51115-79853 --->
+	                AND (lib_type in (#ListQualify(listlibtype,"'",",","ALL")#)
+					<cfif listPeriodComponentUsed neq "">
+						 OR(lib_code in (#ListQualify(listPeriodComponentUsed,"'",",","ALL")#) and lib_type = 'COMPONENT')
+					</cfif>
+					)
+
+	        </cfquery>
+	        <cfquery name="local.qDelDataBefore" datasource="#request.sdsn#">
+	           	DELETE FROM TPMDPERFORMANCE_EVALH
+	            WHERE request_no = <cfqueryparam value="#strckHeadData.request_no#" cfsqltype="cf_sql_varchar">
+	            	AND form_no = <cfqueryparam value="#strckHeadData.form_no#" cfsqltype="cf_sql_varchar">
+	                AND company_code = <cfqueryparam value="#FORM.cocode#" cfsqltype="cf_sql_varchar">  <!----added by  ENC51115-79853 --->
+	                AND reviewee_empid = <cfqueryparam value="#strckHeadData.reviewee_empid#" cfsqltype="cf_sql_varchar">
+	                AND reviewer_empid = <cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">
+	                AND period_code = <cfqueryparam value="#strckHeadData.period_code#" cfsqltype="cf_sql_varchar">
+	        </cfquery>
+			<!---<cfquery name="qInsEvalH" datasource="#request.sdsn#">
+	           	INSERT INTO TPMDPERFORMANCE_EVALH (form_no, request_no, form_order, reference_date, period_code, company_code, reviewee_empid, reviewee_posid, reviewee_grade, reviewee_employcode, reviewer_empid, reviewer_posid, score, conclusion, isfinal, review_step, head_status, lastreviewer_empid, created_by, created_date, modified_by, modified_date)
+				VALUES ( <cfqueryparam value="#strckHeadData.form_no#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.request_no#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.form_order#" cfsqltype="cf_sql_integer">,
+						<cfqueryparam value="#strckHeadData.reference_date#" cfsqltype="cf_sql_timestamp">,
+						<cfqueryparam value="#strckHeadData.period_code#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.company_code#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.reviewee_empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.reviewee_posid#" cfsqltype="cf_sql_integer">,
+						<cfqueryparam value="#strckHeadData.reviewee_grade#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.reviewee_employcode#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.reviewer_empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.reviewer_posid#" cfsqltype="cf_sql_integer">,
+						<cfqueryparam value="#strckHeadData.score#" cfsqltype="cf_sql_float">,
+						<cfqueryparam value="#strckHeadData.conclusion#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.isfinal#" cfsqltype="cf_sql_integer">,
+						<cfqueryparam value="#strckHeadData.review_step#" cfsqltype="cf_sql_integer">,
+						<cfqueryparam value="#strckHeadData.head_status#" cfsqltype="cf_sql_integer">,
+						<cfqueryparam value="#strckHeadData.lastreviewer_empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#now()#" cfsqltype="cf_sql_timestamp">,
+						<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#now()#" cfsqltype="cf_sql_timestamp">
+				)
+	        </cfquery>--->
+			 <cfset local.retvar = variables.objPerfEvalH.Insert(strckHeadData)>
+	       	<!--- panggil fungsi untuk period component --->
+	        <cfset Local.stringJSON = "">
+			<cfdump var='#listPeriodComponentUsed#' label='listPeriodComponentUsed' expand='yes'>
+	        <cfloop list="#listPeriodComponentUsed#" index="local.idxCompUsed">
+	        	<cfif listfindnocase("APPRAISAL,ORGKPI,PERSKPI,COMPETENCY",ucase(idxCompUsed))>
+			        <cfset local.listLib = "">
+			        <cfif structkeyexists(FORM,"#idxCompUsed#_lib")>
+				        <cfset local.listLib = FORM["#idxCompUsed#_lib"]>
+			        </cfif>
+	            	<cfif structkeyexists(FORM,"#idxCompUsed#Array")>
+	                	<cfset stringJSON = FORM["#idxCompUsed#Array"]>
+	                </cfif>
+	                <cfif listlen(listLib)>
+				       	<cfset saveEvalD(idxCompUsed,listlib,strckHeadData,stringJSON,existInPlan)>
+	                </cfif>
+	            </cfif>
+
+	            <!--- insert per komponen period yang dipakai --->
+	            <cfset local.strckEvalD = structnew()>
+		        <cfset strckEvalD["form_no"] = strckHeadData.form_no>
+		        <cfset strckEvalD["company_code"] = FORM.cocode> <!----added by  ENC51115-79853 --->
+				<cfset strckEvalD["coid"] = FORM.coid> <!----added by  ENC51115-79853 --->
+		        <cfset strckEvalD["reviewer_empid"] = strckHeadData.reviewer_empid>
+		        <cfset strckEvalD["reviewer_posid"] = strckHeadData.reviewer_posid>
+		        <cfset strckEvalD["lib_type"] = "COMPONENT">
+				<cfset strckEvalD["lib_code"] = ucase(idxCompUsed)>
+	            <cfif ucase(idxCompUsed) eq "ORGKPI">
+			        <cfset strckEvalD["weight"] = strckFormData["objectiveorg_weight"]>
+			        <cfset strckEvalD["score"] = strckFormData["objectiveorg"]>
+			        <cfset strckEvalD["weightedscore"] = strckFormData["objectiveorg_weighted"]>
+	            <cfelseif ucase(idxCompUsed) eq "PERSKPI">
+			        <cfset strckEvalD["weight"] = strckFormData["objective_weight"]>
+			        <cfset strckEvalD["score"] = strckFormData["objective"]>
+			        <cfset strckEvalD["weightedscore"] = strckFormData["objective_weighted"]>
+	            <cfelse>
+			        <cfset strckEvalD["weight"] = strckFormData["#lcase(idxCompUsed)#_weight"]>
+			        <cfset strckEvalD["score"] = strckFormData["#lcase(idxCompUsed)#"]>
+			        <cfset strckEvalD["weightedscore"] = strckFormData["#lcase(idxCompUsed)#_weighted"]>
+	            </cfif>
+				<cfdump var='#strckevald#' label='strckevald' expand='yes'>
+
+				<cfset retvar = variables.objPerfEvalD.Insert(strckEvalD)>
+
+				<!---- <cfquery name="local.qInsertEvalD" datasource="#request.sdsn#">
+					INSERT INTO TPMDPERFORMANCE_EVALD (form_no,reviewer_empid,reviewer_posid,lib_code,lib_type,company_code,weight,score,
+					weightedscore,created_by,created_date,modified_by,modified_date)
+					VALUES(
+						<cfqueryparam value="#strckEvalD.form_no#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.reviewer_empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.reviewer_posid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.lib_code#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.lib_type#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.company_code#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.weight#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.score#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckEvalD.weightedscore#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#now()#" cfsqltype="cf_sql_timestamp">,
+						<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#now()#" cfsqltype="cf_sql_timestamp">
+					)
+				</cfquery> -----> <!--- remarked by maghdalenasp 2018-03-21 ---->
+
+	        </cfloop>
+			Marc@linenumber<cfabort>
+			<!--- insert additional notes --->
+	        <cfif structkeyexists(StrckFormData,"evalnoterecords")>
+			<cfloop from="1" to="#StrckFormData.evalnoterecords#" index="local.idx">
+				<cfset local.note_name = strckFormData["evalnotename_#idx#"]>
+				<cfset local.note_answer = strckFormData["evalnote_#idx#"]>
+				<cfquery name="local.qInsertAddNotes" datasource="#request.sdsn#">
+					INSERT INTO TPMDPERFORMANCE_EVALNOTE (form_no,company_code,reviewer_empid,reviewer_posid,note_name,note_answer,note_order,created_by,created_date,modified_by,modified_date)
+					VALUES(
+						<cfqueryparam value="#strckHeadData.form_no#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.company_code#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.reviewer_empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#strckHeadData.reviewer_posid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#note_name#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#note_answer#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#idx#" cfsqltype="cf_sql_integer">,
+						<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#now()#" cfsqltype="cf_sql_timestamp">,
+						<cfqueryparam value="#request.scookie.user.empid#" cfsqltype="cf_sql_varchar">,
+						<cfqueryparam value="#now()#" cfsqltype="cf_sql_timestamp">
+					)
+				</cfquery>
+			</cfloop>
+	        </cfif>
+
+	        <!--- Insert ke Tabel Final --->
+	        <cfif strckHeadData.isfinal eq 1>
+		        <cfquery name="local.qCheckIfExistsInFinal" datasource="#request.sdsn#">
+		             SELECT  EH.form_no,EH.company_code,EH.score,EH.conclusion FROM TPMDPERFORMANCE_FINAL F
+		            LEFT JOIN TPMDPERFORMANCE_EVALH EH ON F.form_no = EH.form_no AND F.company_code = EH.company_code
+		            WHERE EH.request_no = <cfqueryparam value="#strckHeadData.request_no#" cfsqltype="cf_sql_varchar"> AND EH.isfinal = 1
+		        </cfquery>
+
+		        <cfif not qCheckIfExistsInFinal.recordcount>
+	    	        <cfquery name="Local.DelFinal" datasource="#request.sdsn#">
+	    	            DELETE FROM TPMDPERFORMANCE_FINAL
+	    	            WHERE form_no = <cfqueryparam value="#qCheckIfExistsInFinal.form_no#" cfsqltype="cf_sql_varchar">
+	    	                AND company_code = <cfqueryparam value="#qCheckIfExistsInFinal.company_code#" cfsqltype="cf_sql_varchar">
+	    			</cfquery>
+	    	        <cfquery name="Local.qInsertFinalData" datasource="#request.sdsn#">
+	    				INSERT INTO TPMDPERFORMANCE_FINAL (form_no,	company_code, period_code, reference_date, reviewee_empid, reviewee_posid, reviewee_grade, reviewee_employcode, final_score, final_conclusion, created_by, created_date, modified_by, modified_date, ori_conclusion)
+	        	        SELECT EH.form_no, EH.company_code, EH.period_code, EH.reference_date, EH.reviewee_empid, EH.reviewee_posid, EH.reviewee_grade, EH.reviewee_employcode, EH.score AS final_score, EH.conclusion AS final_conclusion, '#request.scookie.user.uname#', <cfif request.dbdriver EQ "MSSQL">getdate()<cfelse>now()</cfif>, '#request.scookie.user.uname#', <cfif request.dbdriver EQ "MSSQL">getdate()<cfelse>now()</cfif>, EH.conclusion AS ori_conclusion
+	    	            FROM TPMDPERFORMANCE_EVALH EH
+	    			    WHERE request_no = <cfqueryparam value="#strckHeadData.request_no#" cfsqltype="cf_sql_varchar">
+	    	                AND isfinal = 1
+	    			</cfquery>
+	            <!---BUG50915-51098--->
+	            <cfelse>
+	                <cfquery name="Local.qUpdateFinalData" datasource="#request.sdsn#">
+	    				UPDATE TPMDPERFORMANCE_FINAL
+	    				SET final_score = <cfqueryparam value="#qCheckIfExistsInFinal.score#" cfsqltype="cf_sql_varchar">
+	    				,final_conclusion = <cfqueryparam value="#qCheckIfExistsInFinal.conclusion#" cfsqltype="cf_sql_varchar">
+	    				,modified_by = <cfqueryparam value="#request.scookie.user.uname#" cfsqltype="cf_sql_varchar">
+	    				,modified_date = <cfif request.dbdriver EQ "MSSQL">getdate()<cfelse>now()</cfif>
+	    				,ori_conclusion = <cfqueryparam value="#qCheckIfExistsInFinal.conclusion#" cfsqltype="cf_sql_varchar">
+	    			    WHERE form_no = <cfqueryparam value="#qCheckIfExistsInFinal.form_no#" cfsqltype="cf_sql_varchar">
+	    	            AND company_code = <cfqueryparam value="#qCheckIfExistsInFinal.company_code#" cfsqltype="cf_sql_varchar">
+	    			</cfquery>
+	            </cfif>
+	            <!---BUG50915-51098--->
+	        </cfif>
+
+	        <!--- Approved Data Request --->
+	        <cfif strckHeadData.head_status eq 1 and (strckFormData.RevieweeAsApprover neq 1 or (strckFormData.RevieweeAsApprover eq 1 and strckFormData.requestfor neq request.scookie.user.empid))>
+	            <cfquery name="local.qGetApprovedDataFromReq" datasource="#request.sdsn#">
+	            	SELECT  approved_data FROM TCLTREQUEST
+					WHERE req_type = 'PERFORMANCE.EVALUATION'
+						AND req_no = <cfqueryparam value="#strckHeadData.request_no#" cfsqltype="cf_sql_varchar">
+						AND company_id = <cfqueryparam value="#FORM.coid#" cfsqltype="cf_sql_integer"> <!----added by  ENC51115-79853 --->
+						AND company_code = <cfqueryparam value="#FORM.cocode#" cfsqltype="cf_sql_varchar"> <!----added by  ENC51115-79853 --->
+						and req_no <> ''
+	            </cfquery>
+
+	            <cfset LOCAL.strckApprovedData=SFReqFormat(qGetApprovedDataFromReq.approved_data,"R")>
+	            <!---TW:<cfif IsJSON(qGetApprovedDataFromReq.approved_data)>
+	                <cfset LOCAL.strckApprovedData=DeserializeJSON(qGetApprovedDataFromReq.approved_data)>
+				<cfelseif IsWDDX(qGetApprovedDataFromReq.approved_data)>
+					<cfwddx action="wddx2cfml" input="#qGetApprovedDataFromReq.approved_data#" output="LOCAL.strckApprovedData">
+	            <cfelse>
+					<cfset LOCAL.strckApprovedData = StructNew() />
+	            </cfif>--->
+				<cfset var strckFormInbox = StructNew() />
+				<cfset strckFormInbox['DTIME'] = Now() />
+				<cfset strckFormInbox['DECISION'] = 1 />
+				<cfset strckFormInbox['NOTES'] = "" />
+				<cfset strckApprovedData[request.scookie.user.uid] = strckFormInbox />
+				<cfset LOCAL.wddxApprovedData=SFReqFormat(strckApprovedData,"W")>
+				<!---TW:<cfwddx action="cfml2wddx" input="#strckApprovedData#" output="wddxApprovedData">--->
+
+
+	   	       	<cfquery name="local.qUpdApprovedData" datasource="#request.sdsn#">
+					UPDATE TCLTREQUEST
+					SET approved_data = <cfqueryparam value="#wddxApprovedData#" cfsqltype="cf_sql_varchar">
+					WHERE req_type = 'PERFORMANCE.EVALUATION'
+						AND req_no = <cfqueryparam value="#strckHeadData.request_no#" cfsqltype="cf_sql_varchar">
+						AND company_id = <cfqueryparam value="#FORM.coid#" cfsqltype="cf_sql_integer"> <!----added by  ENC51115-79853 --->
+						AND company_code = <cfqueryparam value="#FORM.cocode#" cfsqltype="cf_sql_varchar"> <!----added by  ENC51115-79853 --->
+
+				</cfquery>
+	        </cfif>
+	        </cftransaction>
+	    </cffunction> --->
+
+</cfcomponent>
