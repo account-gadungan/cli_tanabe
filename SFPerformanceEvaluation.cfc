@@ -3076,10 +3076,10 @@
 		        <cfset strckEvalD["parent_path"] = qGetLibDetail.parent_path>
 				
 				
-				  <cfset local.retvar = variables.objPerfEvalD.Insert(strckEvalD)>   
+			<!---	  <cfset local.retvar = variables.objPerfEvalD.Insert(strckEvalD)>   
 				<cfif retvar>
 					<cf_sfwritelog dump="strckEvalD" prefix="strckEvalD_kedua_">
-				<cfelse>
+				<cfelse> ---->
 					<cf_sfwritelog dump="strckEvalD" prefix="strckEvalD_lagi_#strckEvalD['lib_code']#">
 					<cfquery name="local.qInsertEvalD" datasource="#request.sdsn#">
 					INSERT INTO TPMDPERFORMANCE_EVALD (form_no,reviewer_empid,reviewer_posid,lib_code,lib_type,company_code,weight,achievement,score,weightedscore,target,notes,created_by,created_date,modified_by,modified_date,lib_name_en,lib_desc_en,iscategory,lib_depth,parent_code,parent_path,achievement_type,lookup_code) 
@@ -3112,7 +3112,7 @@
 						
 					)				
 				</cfquery>
-				</cfif>
+				<!----</cfif> ---->
 				<!----<cfquery name="local.qInsertEvalD" datasource="#request.sdsn#">
 					INSERT INTO TPMDPERFORMANCE_EVALD (form_no,reviewer_empid,reviewer_posid,lib_code,lib_type,company_code,weight,achievement,score,weightedscore,target,notes,created_by,created_date,modified_by,modified_date,lib_name_en,lib_desc_en,iscategory,lib_depth,parent_code,parent_path,achievement_type,lookup_code) 
 					VALUES (
