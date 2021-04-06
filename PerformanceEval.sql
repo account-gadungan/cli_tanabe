@@ -64,7 +64,12 @@ AND upper(ED.lib_type) = 'APPRAISAL'
 AND ED.reviewer_empid IN ('DO200689')
 ORDER BY LIBCODE ;
 
-select * from TPMDPERFORMANCE_EVALD where achievement_type like '%zero%';
+select * from TPMDPERFORMANCE_planD where achievement_type like '%zero%';
+
+update TPMDPERFORMANCE_EVALD 
+set achievement_type = 'QuestScore ' 
+where achievement_type like '%zero%';
+
 select * from TPMDPERFORMANCE_EVALD where lib_desc_en like '%abs%';
 
 select * from TPMDPERFORMANCE_EVALD order by created_date desc
@@ -111,10 +116,13 @@ select distinct
 from tpmdperformance_evalh te where form_no in
 (
 	-- select form_no from TPMDPERFORMANCE_EVALD where lib_desc_en like '%abs%' and weight is null
-	select form_no from TPMDPERFORMANCE_EVALD where achievement_type like '%zero%'
+	select distinct lib_type from TPMDPERFORMANCE_EVALD where achievement_type like '%zero%'
 ) 
 -- order by reviewee_empid;
 order by emp;
+
+select distinct lib_type from TPMDPERFORMANCE_EVALD where achievement_type like '%zero%';
+select * from TPMDPERFORMANCE_EVALD where achievement_type like '%zero%';
 
 delete from tcltrequest where req_no in(
 	select distinct request_no
@@ -235,7 +243,30 @@ modify column achievement varchar(2500);
 
 
 select * from tpmdperformance_evalh te where reviewee_empid in (select emp_id from teodempcompany t2 where emp_no = '1995016');
-select * from tpmdperformance_evalh te where form_no = 'PEF-2008-0011';
-select * from tpmdperformance_evald where form_no = 'PEF-2008-0011';
+select * from tpmdperformance_evalh te where form_no = 'PEF-2103-0059';
+select * from tpmdperformance_evald where form_no = 'PEF-2103-0059' and lib_type = 'persKPI' order by weightedscore;
+and achievement <> score ;
+
 select * from tcltrequest t  where req_no = 'CPM-2104-0091';
 
+create table evald_bu_marc as 
+select * from tpmdperformance_evald;
+
+select (
+	select d.form_no, d.reviewer_empid,h.review_step,sum(weight) 
+	from tpmdperformance_evalh d
+	inner join tpmdperformance_evalh h on d.form_no = h.form_no 
+	where 1=1 
+	-- and d.form_no = 'PEF-2103-0059' 
+	and lib_type = 'persKPI'
+	group by d.form_no, d.reviewer_empid,h.review_step;
+)
+
+select * from evald_bu_marc where form_no = 'PEF-2103-0059' and lib_type = 'persKPI' order by weightedscore;
+and achievement <> score;
+
+update evald_bu_marc 
+set score = achievement 
+where form_no = 'PEF-2103-0059' and lib_type = 'persKPI';
+
+select * from tpmdperformance_evald where form_no = 'PEF-2006-0002';
