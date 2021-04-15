@@ -1,0 +1,19 @@
+THR
+====
+IIF(DateDiff('d',JOINDATE,PAYDATE) lt 28,0,
+    IIF(DateDiff('yyyy',JOINDATE,PAYDATE) lt 1
+        ,IIF(DateDiff('d',JOINDATE,PAYDATE) gt 28
+            ,IIF(GRADE NEQ '10'
+                ,(SALARY+@NETITLE+@NEFAMILY+1212000)*DateDiff('d',JOINDATE,PAYDATE)/365
+                ,(SALARY+@NETITLE+@NEFAMILY)*DateDiff('d',JOINDATE,PAYDATE)/365)
+            ,0)
+        ,IIF(DateDiff('yyyy',JOINDATE,PAYDATE) LT 6
+            ,IIF(GRADE NEQ '10'
+                ,SALARY+@NETITLE+@NEFAMILY+1212000
+                ,SALARY+@NETITLE+@NEFAMILY)
+            ,IIF(GRADE NEQ '10'
+                ,(SALARY+@NETITLE+@NEFAMILY+1212000)*1.25
+                ,(SALARY+@NETITLE+@NEFAMILY)*1.25)
+        )
+    )
+)
