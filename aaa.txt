@@ -1,0 +1,17 @@
+login Proxy:
+0492139
+P@ssw0rd2093
+dan
+0919720
+0919720Prx
+
+10.181.25.38
+/lucee/admin/server.cfm
+
+buat login gd di browser:
+103.79.96.62
+mtindonesia-go|http://10.181.26.39-gd|http://10.181.26.39/v2-sf|http://10.181.26.38/sf6/index.cfm
+buat dbug error gd replace general-1607581731152 dengan log errornya:
+http://10.181.26.39/v2/error-log?log=general-1607581731152
+
+2010039 - Yuliana Triningsih
