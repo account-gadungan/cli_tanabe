@@ -1,2 +1,0 @@
-select * from tpmdperformance_evalh where reviewee_empid in ( select emp_id from teodempcompany where emp_no = 'xxxx' )
-
